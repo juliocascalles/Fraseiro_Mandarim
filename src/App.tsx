@@ -18,6 +18,7 @@ type Category = 'pronoun' | 'plural' | 'adverb' | 'verb' | 'country' | 'suffix' 
 interface Word {
   id: string;
   label: string;
+  translation: string;
   category: Category;
   icon: React.ElementType;
   requiresGuo?: boolean;
@@ -26,48 +27,48 @@ interface Word {
 // --- Data ---
 const WORDS: Word[] = [
   // Pronouns
-  { id: 'wo', label: 'wo', category: 'pronoun', icon: User },
-  { id: 'ni', label: 'ni', category: 'pronoun', icon: User },
-  { id: 'ta', label: 'ta', category: 'pronoun', icon: User },
+  { id: 'wo', label: 'wo', translation: 'eu', category: 'pronoun', icon: User },
+  { id: 'ni', label: 'ni', translation: 'você', category: 'pronoun', icon: User },
+  { id: 'ta', label: 'ta', translation: 'ele/ela', category: 'pronoun', icon: User },
   
   // Plural
-  { id: 'men', label: 'men', category: 'plural', icon: Users },
+  { id: 'men', label: 'men', translation: 'plural', category: 'plural', icon: Users },
   
   // Possessive
-  { id: 'de', label: 'de', category: 'possessive', icon: Tag },
+  { id: 'de', label: 'de', translation: 'de (posse)', category: 'possessive', icon: Tag },
 
   // Adverbs
-  { id: 'dou', label: 'dou', category: 'adverb', icon: PlusSquare }, // todos
-  { id: 'ye', label: 'ye', category: 'adverb', icon: RefreshCcw }, // também
-  { id: 'bu', label: 'bù', category: 'adverb', icon: XCircle }, // não
-  { id: 'zhi', label: 'zhi', category: 'adverb', icon: Target }, // apenas
+  { id: 'dou', label: 'dou', translation: 'todos', category: 'adverb', icon: PlusSquare }, // todos
+  { id: 'ye', label: 'ye', translation: 'também', category: 'adverb', icon: RefreshCcw }, // também
+  { id: 'bu', label: 'bù', translation: 'não', category: 'adverb', icon: XCircle }, // não
+  { id: 'zhi', label: 'zhi', translation: 'apenas', category: 'adverb', icon: Target }, // apenas
   
   // Verbs
-  { id: 'shi', label: 'shi', category: 'verb', icon: UserCheck }, // ser
-  { id: 'shuo', label: 'shuo', category: 'verb', icon: MessageSquare }, // falar
-  { id: 'jiao', label: 'jiao', category: 'verb', icon: Tag }, // chamar
+  { id: 'shi', label: 'shi', translation: 'ser', category: 'verb', icon: UserCheck }, // ser
+  { id: 'shuo', label: 'shuo', translation: 'falar', category: 'verb', icon: MessageSquare }, // falar
+  { id: 'jiao', label: 'jiao', translation: 'chamar-se', category: 'verb', icon: Tag }, // chamar
 
   // Questions
-  { id: 'ma', label: 'ma', category: 'question', icon: HelpCircle }, // end particle
-  { id: 'na', label: 'na', category: 'question', icon: Search }, // qual?
-  { id: 'shenme', label: 'shenme', category: 'question', icon: Info }, // que?
+  { id: 'ma', label: 'ma', translation: '?', category: 'question', icon: HelpCircle }, // end particle
+  { id: 'na', label: 'na', translation: 'qual', category: 'question', icon: Search }, // qual?
+  { id: 'shenme', label: 'shenme', translation: 'o quê', category: 'question', icon: Info }, // que?
 
   // Countries
-  { id: 'baxi', label: 'baxi', category: 'country', icon: Globe },
-  { id: 'jianada', label: 'jianada', category: 'country', icon: Globe },
-  { id: 'putaoya', label: 'putaoya', category: 'country', icon: Globe },
-  { id: 'fa', label: 'fa', category: 'country', icon: Globe, requiresGuo: true },
-  { id: 'ying', label: 'ying', category: 'country', icon: Globe, requiresGuo: true },
+  { id: 'baxi', label: 'baxi', translation: 'Brasil', category: 'country', icon: Globe },
+  { id: 'jianada', label: 'jianada', translation: 'Canadá', category: 'country', icon: Globe },
+  { id: 'putaoya', label: 'putaoya', translation: 'Portugal', category: 'country', icon: Globe },
+  { id: 'fa', label: 'fa', translation: 'França', category: 'country', icon: Globe, requiresGuo: true },
+  { id: 'ying', label: 'ying', translation: 'Inglaterra', category: 'country', icon: Globe, requiresGuo: true },
 
   // Gentilics parts
-  { id: 'guo', label: 'guo', category: 'guo', icon: Flag },
-  { id: 'yu', label: 'yu', category: 'suffix', icon: Type }, // idioma
-  { id: 'ren', label: 'ren', category: 'suffix', icon: Users }, // nacionalidade
+  { id: 'guo', label: 'guo', translation: 'país', category: 'guo', icon: Flag },
+  { id: 'yu', label: 'yu', translation: 'idioma', category: 'suffix', icon: Type }, // idioma
+  { id: 'ren', label: 'ren', translation: 'pessoa', category: 'suffix', icon: Users }, // nacionalidade
 
   // Nouns
-  { id: 'mingzi', label: 'ming zi', category: 'noun', icon: FileText },
-  { id: 'tongxue', label: 'tongxue', category: 'noun', icon: GraduationCap },
-  { id: 'laoshi', label: 'laoshi', category: 'noun', icon: Briefcase },
+  { id: 'mingzi', label: 'ming zi', translation: 'nome', category: 'noun', icon: FileText },
+  { id: 'tongxue', label: 'tongxue', translation: 'colega', category: 'noun', icon: GraduationCap },
+  { id: 'laoshi', label: 'laoshi', translation: 'professor', category: 'noun', icon: Briefcase },
 ];
 
 export default function App() {
@@ -125,7 +126,11 @@ export default function App() {
 
     // Rule 8 - Question particles na/shenme selected
     if (last.id === 'na' || last.id === 'shenme') {
-      return WORDS.filter(w => ['noun', 'country'].includes(w.category));
+      // Logic fix: Enable 'guo' after 'na' for "na guo ren"
+      return WORDS.filter(w => {
+        if (last.id === 'na' && w.id === 'guo') return true;
+        return ['noun', 'country'].includes(w.category);
+      });
     }
 
     // Rule 9/12 - Country selected
@@ -138,8 +143,16 @@ export default function App() {
       // Rule 10/11: Filter suffix by verb
       return WORDS.filter(w => {
         if (w.category !== 'suffix') return false;
-        if (activeVerb?.id === 'shuo') return w.id === 'yu';
-        if (activeVerb?.id === 'shi') return w.id === 'ren';
+
+        // Logic fix (new): Brazil and Canada don't have a '-yu' (language) form
+        const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
+
+        if (activeVerb?.id === 'shuo') {
+          return w.id === 'yu' && supportsLanguageSuffix;
+        }
+        if (activeVerb?.id === 'shi') {
+          return w.id === 'ren';
+        }
         return true;
       });
     }
@@ -247,8 +260,9 @@ export default function App() {
                       onClick={() => addWord(word)}
                       className={`flex flex-col items-center justify-center p-3 w-16 h-16 sm:w-24 sm:h-24 ${bgColor} border-2 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-transform group`}
                     >
-                      <Icon size={24} className="mb-2 group-hover:scale-110 transition-transform" />
+                      <Icon size={24} className="mb-1 group-hover:scale-110 transition-transform" />
                       <span className="text-[9px] font-bold uppercase text-center leading-tight tracking-wider">{word.label}</span>
+                      <span className="text-[8px] opacity-40 font-medium text-center leading-tight">({word.translation})</span>
                     </motion.button>
                   );
                 })}
@@ -305,7 +319,8 @@ export default function App() {
                           <Icon size={40} />
                         </div>
                         <Icon size={32} className="relative z-10" />
-                        <span className="text-xs font-display uppercase mt-4 tracking-tight relative z-10">{word.label}</span>
+                        <span className="text-xs font-display uppercase mt-3 tracking-tight relative z-10">{word.label}</span>
+                        <span className="text-[10px] font-medium opacity-50 relative z-10">({word.translation})</span>
                         <div className="absolute bottom-0 inset-x-0 h-1 bg-black/5" />
                       </div>
                       
