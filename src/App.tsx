@@ -89,14 +89,16 @@ export default function App() {
 
     // Rule 2/3 - Pronoun selected
     if (last.category === 'pronoun') {
-      // Can be followed by men (plural), possessive (de), adverb, verb, or noun (Rule 3 composition)
-      return WORDS.filter(w => ['plural', 'possessive', 'adverb', 'verb', 'noun'].includes(w.category));
+      // Can be followed by men (plural), possessive (de), adverb, or verb
+      // Noun removed per latest requirement (only after verb or possessive)
+      return WORDS.filter(w => ['plural', 'possessive', 'adverb', 'verb'].includes(w.category));
     }
 
     // Rule 3/4 - Plural selected
     if (last.category === 'plural') {
-      // Followed by possessive (de), adverb, verb, or noun
-      return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'noun'].includes(w.category));
+      // Followed by possessive (de), adverb, or verb
+      // Noun removed per latest requirement
+      return WORDS.filter(w => ['possessive', 'adverb', 'verb'].includes(w.category));
     }
 
     // Rule 3 - Possessive selected
@@ -220,7 +222,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
-            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.0</p>
+            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.5</p>
           </div>
         </div>
         <button 
