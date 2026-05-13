@@ -8,12 +8,13 @@ import {
   User, Users, MessageSquare, UserCheck, Globe, 
   Flag, Type, HelpCircle, Search, Info, PlusSquare, 
   RefreshCcw, XCircle, Target, FileText, GraduationCap, 
-  Briefcase, Tag, Trash2, ArrowRight
+  Briefcase, Tag, Trash2, ArrowRight, Book, Cat, Dog, 
+  Droplets, Coffee, CupSoda, Milk, Utensils, Soup
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // --- Types ---
-type Category = 'pronoun' | 'plural' | 'adverb' | 'verb' | 'country' | 'suffix' | 'noun' | 'question' | 'guo' | 'possessive';
+type Category = 'pronoun' | 'plural' | 'adverb' | 'verb' | 'country' | 'suffix' | 'noun' | 'question' | 'guo' | 'possessive' | 'thing';
 
 interface Word {
   id: string;
@@ -47,6 +48,7 @@ const WORDS: Word[] = [
   { id: 'shi', label: 'shi', translation: 'ser', category: 'verb', icon: UserCheck }, // ser
   { id: 'shuo', label: 'shuo', translation: 'falar', category: 'verb', icon: MessageSquare }, // falar
   { id: 'jiao', label: 'jiao', translation: 'chamar-se', category: 'verb', icon: Tag }, // chamar
+  { id: 'xihuan', label: 'xihuan', translation: 'gostar', category: 'verb', icon: Target },
 
   // Questions
   { id: 'ma', label: 'ma', translation: '?', category: 'question', icon: HelpCircle }, // end particle
@@ -69,6 +71,17 @@ const WORDS: Word[] = [
   { id: 'mingzi', label: 'ming zi', translation: 'nome', category: 'noun', icon: FileText },
   { id: 'tongxue', label: 'tongxue', translation: 'colega', category: 'noun', icon: GraduationCap },
   { id: 'laoshi', label: 'laoshi', translation: 'professor', category: 'noun', icon: Briefcase },
+
+  // Things (Coisas)
+  { id: 'shu', label: 'shu', translation: 'livro', category: 'thing', icon: Book },
+  { id: 'mao', label: 'mao', translation: 'gato', category: 'thing', icon: Cat },
+  { id: 'gou', label: 'gou', translation: 'cachorro', category: 'thing', icon: Dog },
+  { id: 'shui', label: 'shui', translation: 'água', category: 'thing', icon: Droplets },
+  { id: 'cha', label: 'cha', translation: 'chá', category: 'thing', icon: CupSoda },
+  { id: 'kafei', label: 'kafei', translation: 'café', category: 'thing', icon: Coffee },
+  { id: 'mifan', label: 'mifan', translation: 'arroz', category: 'thing', icon: Utensils },
+  { id: 'mianbao', label: 'mianbao', translation: 'pão', category: 'thing', icon: Milk }, // Using Milk as bread placeholder or similar
+  { id: 'tang', label: 'tang', translation: 'sopa', category: 'thing', icon: Soup },
 ];
 
 export default function App() {
@@ -114,6 +127,11 @@ export default function App() {
 
     // Rule 6/8 - Verb selected
     if (last.category === 'verb') {
+      // Logic fix (new verb Rule): After 'xihuan', only 'thing' and 'pronoun' are allowed
+      if (last.id === 'xihuan') {
+        return WORDS.filter(w => ['thing', 'pronoun'].includes(w.category));
+      }
+
       // Can follow with: substantivo, pronome composto, na/shenme
       return WORDS.filter(w => {
         // Particles na and shenme
@@ -167,8 +185,8 @@ export default function App() {
       });
     }
 
-    // Rule 7/Suffix/Noun selected
-    if (last.category === 'suffix' || last.category === 'noun') {
+    // Rule 7/Suffix/Noun/Thing selected
+    if (last.category === 'suffix' || last.category === 'noun' || last.category === 'thing') {
       const isComposto = sequence.some(w => w.category === 'possessive');
       const verbExists = sequence.some(w => w.category === 'verb');
 
@@ -208,6 +226,7 @@ export default function App() {
       case 'guo': return 'bg-cyan-50';
       case 'plural': return 'bg-indigo-50';
       case 'possessive': return 'bg-rose-100';
+      case 'thing': return 'bg-orange-50';
       default: return 'bg-white';
     }
   };
