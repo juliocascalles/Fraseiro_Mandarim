@@ -41,7 +41,7 @@ const WORDS: Word[] = [
 
   // Adverbs
   { id: 'dou', label: 'dou', hanzi: '都', translation: 'todos', category: 'adverb', icon: PlusSquare }, // todos
-  { id: 'ye', label: 'ye', hanzi: 'ye', translation: 'também', category: 'adverb', icon: RefreshCcw }, // também
+  { id: 'ye', label: 'ye', hanzi: '也', translation: 'também', category: 'adverb', icon: RefreshCcw }, // também
   { id: 'bu', label: 'bù', hanzi: '不', translation: 'não', category: 'adverb', icon: XCircle }, // não
   { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target }, // apenas
   
