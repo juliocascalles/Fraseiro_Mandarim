@@ -129,7 +129,13 @@ export default function App() {
     if (last.category === 'verb') {
       // Logic fix (new verb Rule): After 'xihuan', only 'thing' and 'pronoun' are allowed
       if (last.id === 'xihuan') {
-        return WORDS.filter(w => ['thing', 'pronoun'].includes(w.category));
+        const subjectPronoun = sequence.find(w => w.category === 'pronoun');
+        return WORDS.filter(w => {
+          if (w.category === 'thing') return true;
+          // Exclude the subject pronoun to avoid "wo xihuan wo"
+          if (w.category === 'pronoun' && w.id !== subjectPronoun?.id) return true;
+          return false;
+        });
       }
 
       // Can follow with: substantivo, pronome composto, na/shenme
