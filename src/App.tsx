@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   User, Users, MessageSquare, UserCheck, Globe, 
   Flag, Type, HelpCircle, Search, Info, PlusSquare, 
   RefreshCcw, XCircle, Target, FileText, GraduationCap, 
   Briefcase, Tag, Trash2, ArrowRight, Book, Cat, Dog, 
-  Droplets, Coffee, CupSoda, Milk, Utensils, Soup
+  Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
+  Sparkles, X, CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -72,7 +73,7 @@ const WORDS: Word[] = [
   { id: 'xihuan', label: 'xihuan', hanzi: '喜欢', translation: 'gostar', category: 'verb', icon: Target },
   { id: 'zai', label: 'zai', hanzi: '在', translation: 'estar/em', category: 'verb', icon: Target },
   { id: 'keyi', label: 'ke yi', hanzi: '可以', translation: 'poder', category: 'verb', icon: UserCheck },
-  { id: 'da_call', label: 'da', hanzi: '打', translation: 'ligar (fone)', category: 'verb', icon: MessageSquare },
+  { id: 'da_call', label: 'da', hanzi: '打', translation: 'ligar', category: 'verb', icon: MessageSquare },
   { id: 'fa_verb', label: 'fa', hanzi: '发', translation: 'enviar', category: 'verb', icon: PlusSquare },
   { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber/conhecer', category: 'verb', icon: FileText },
   { id: 'zuo', label: 'zuo', hanzi: '坐', translation: 'sentar', category: 'verb', icon: UserCheck },
@@ -155,282 +156,406 @@ const WORDS: Word[] = [
 
 export default function App() {
   const [sequence, setSequence] = useState<Word[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [translation, setTranslation] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState('');
 
-  // --- Rule Logic ---
-  const availableWords = useMemo(() => {
-    if (sequence.length === 0) {
-      // Começa com pronome ou etiqueta (ex: qing, xie xie)
-      return WORDS.filter(w => w.category === 'pronoun' || w.category === 'etiquette');
-    }
-
-    const last = sequence[sequence.length - 1];
-    const prev = sequence.length > 1 ? sequence[sequence.length - 2] : null;
-    
-    // Find active verb in the sequence
-    const activeVerb = [...sequence].reverse().find(w => w.category === 'verb');
-    const verbExists = sequence.some(w => w.category === 'verb');
-    const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id));
-    const activePreposition = [...sequence].reverse().find(w => w.category === 'preposition');
-
-    // Case: Etiquette selected
-    if (last.category === 'etiquette') {
-      if (last.id === 'qing') {
-        // qing (por favor) can be followed by: zuo (sentar), he (beber), jin (entrar)
-        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
-      }
-      if (last.id === 'xie_xie') {
-        // xie xie can be followed by pronoun (ex: xie xie ni)
-        return WORDS.filter(w => w.category === 'pronoun');
-      }
-      return [];
-    }
-
-    // Case: Preposition selected (ex: gei)
-    if (last.category === 'preposition') {
-      if (last.id === 'gei') {
-        // Must be followed by recipient (pronoun, noun)
-        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun');
-      }
-      return [];
-    }
-
-    // Case: Pronoun selected (wo, ni, ta, zhe)
-    if (last.category === 'pronoun') {
-      // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
-      if (prev?.category === 'preposition' && prev.id === 'gei') {
-        // verbs suitable after gei + recipient: da_call, fa_verb, shuo
-        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
-      }
-
-      // If a verb exists in the sequence
-      if (verbExists) {
-        // Pronoun as Object
-        if (activeVerb?.id === 'xihuan') {
-          // After xihuan + pronoun: can end or take 'ma' (if not already question)
-          return WORDS.filter(w => {
-            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-            return false;
-          });
-        }
-        
-        // General object pronoun
-        return WORDS.filter(w => {
-          if (['plural', 'possessive'].includes(w.category)) return true;
-          if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-          return false;
-        });
-      } else {
-        // Pronoun as Subject
-        return WORDS.filter(w => {
-          // Can take: plural (except for 'zhe'), possessive 'de', adverb, verb, or adjective (sem verbo)
-          if (w.category === 'plural' && last.id !== 'zhe') return true;
-          if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
-          if (w.category === 'preposition') return true; // ex: wo gei ...
-          return false;
-        });
-      }
-    }
-
-    // Case: Plural selected (men)
-    if (last.category === 'plural') {
-      if (verbExists) {
-        return WORDS.filter(w => {
-          if (w.category === 'possessive') return true;
-          if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-          return false;
-        });
-      } else {
-        return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category));
-      }
-    }
-
-    // Case: Possessive selected (de)
-    if (last.category === 'possessive') {
-      // Must be followed by noun, country, thing or adjective (compound)
-      return WORDS.filter(w => ['noun', 'country', 'thing', 'adjective'].includes(w.category));
-    }
-
-    // Case: Adverb selected (hen, bu, dou, ye, zhi)
-    if (last.category === 'adverb') {
-      if (last.id === 'hen') {
-        // 'hen' is used with adjectives for emphasis
-        return WORDS.filter(w => w.category === 'adjective');
-      }
-      if (last.id === 'bu') {
-        // 'bu' can negate verbs or adjectives
-        return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
-      }
-      // 'dou', 'ye', 'zhi' can go to verb or other adverbs (e.g. 'ye hen', 'dou hen', 'ye bu')
-      return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
-    }
-
-    // Case: Verb selected
-    if (last.category === 'verb') {
-      if (last.id === 'xihuan') {
-        const subjectPronoun = sequence.find(w => w.category === 'pronoun');
-        return WORDS.filter(w => {
-          if (w.category === 'thing') return true;
-          // Exclude subject pronoun to avoid "wo xihuan wo"
-          if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
-          return false;
-        });
-      }
-
-      if (last.id === 'shuo') {
-        // No nouns (mingzi, tongxue, laoshi) directly after shuo
-        return WORDS.filter(w => {
-          if (w.id === 'na' || w.id === 'shenme') return true;
-          if (w.category === 'country') {
-            // baxi and jianada don't form idioms, hide them
-            return !['baxi', 'jianada'].includes(w.id);
-          }
-          if (w.category === 'pronoun') return true;
-          return false;
-        });
-      }
-
-      if (last.id === 'jiao') {
-        return WORDS.filter(w => w.id === 'shenme' || w.category === 'noun' || w.category === 'pronoun');
-      }
-
-      if (last.id === 'zai') {
-        // zai can be followed by location questions (nali) or nouns of places (xuexiao, daxue)
-        return WORDS.filter(w => w.id === 'nali' || ['xuexiao', 'daxue', 'country'].includes(w.category));
-      }
-
-      if (last.id === 'keyi') {
-        // keyi (poder) can be followed by action verbs
-        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
-      }
-
-      if (last.id === 'da_call') {
-        // da (dial) -> dianhua (phone)
-        return WORDS.filter(w => w.id === 'dianhua');
-      }
-
-      if (last.id === 'fa_verb') {
-        // fa (send) -> youjian (email)
-        return WORDS.filter(w => w.id === 'youjian');
-      }
-
-      if (last.id === 'zhidao') {
-        // zhidao can take nouns/things/pronouns
-        return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question'].includes(w.category));
-      }
-
-      if (last.id === 'he') {
-        // he (drink) -> beverage things
-        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
-      }
-
-      // Default verb output: can follow with nouns, countries, pronouns, questions
-      return WORDS.filter(w => {
-        if (['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id)) return true;
-        if (['noun', 'country', 'pronoun', 'thing'].includes(w.category)) return true;
-        return false;
-      });
-    }
-
-    // Case: Question particles
-    if (last.id === 'na' || last.id === 'shenme') {
-      return WORDS.filter(w => {
-        if (last.id === 'na' && w.id === 'guo') return true;
-        if (w.category === 'country' && activeVerb?.id === 'shuo') {
-          return !['baxi', 'jianada'].includes(w.id);
-        }
-        if (last.id === 'shenme' && w.id === 'mingzi') return true;
-        if (last.id === 'shenme' && w.id === 'gongzuo') return true;
-        return ['noun', 'country', 'thing'].includes(w.category);
-      });
-    }
-
-    // Case: Country selected
-    if (last.category === 'country') {
-      if (last.requiresGuo && activeVerb?.id === 'shi') {
-        return WORDS.filter(w => w.id === 'guo');
-      }
-      
-      return WORDS.filter(w => {
-        if (w.category !== 'suffix') return false;
-        const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
-
-        if (activeVerb?.id === 'shuo') {
-          return w.id === 'yu' && supportsLanguageSuffix;
-        }
-        if (activeVerb?.id === 'shi') {
-          return w.id === 'ren';
-        }
-        return true;
-      });
-    }
-
-    // Case: Guo selected
-    if (last.category === 'guo') {
-      return WORDS.filter(w => w.id === 'ren');
-    }
-
-    // Case: Suffix, Noun, Thing, Adjective, Number
-    if (
-      last.category === 'suffix' || 
-      last.category === 'noun' || 
-      last.category === 'thing' || 
-      last.category === 'adjective' ||
-      last.category === 'number'
-    ) {
-      // Sub-rules for nested noun compound combinations
-      if (last.id === 'nan' || last.id === 'nü') {
-        return WORDS.filter(w => w.id === 'pengyou');
-      }
-      if (last.id === 'dianhua') {
-        return WORDS.filter(w => w.id === 'haoma' || w.id === 'da_call');
-      }
-      if (last.id === 'haoma') {
-        return WORDS.filter(w => w.id === 'duoshao' || w.category === 'number' || w.id === 'shi');
-      }
-      if (last.id === 'gongzuo') {
-        return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
-      }
-
-      // If we are stating a phone number
-      if (last.category === 'number') {
-        return WORDS.filter(w => w.category === 'number' || w.id === 'ma');
-      }
-
-      // General endings
-      const isComposto = sequence.some(w => w.category === 'possessive');
-      if (!verbExists && isComposto && last.category !== 'adjective') {
-        return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
-      }
-
-      // Questions are final, but can have 'ma' if not a question already
-      if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
-        return WORDS.filter(w => w.id === 'ma');
-      }
-
-      return [];
-    }
-
-    return [];
+  // Clear any existing translation when the sequence of words changes
+  useEffect(() => {
+    setTranslation('');
+    setTranslationError('');
+    setIsTranslating(false);
   }, [sequence]);
+
+  const handleTranslate = async () => {
+    if (sequence.length === 0) return;
+
+    setIsTranslating(true);
+    setTranslationError('');
+    setTranslation('');
+
+    const text = sequence.map(w => w.hanzi).join('');
+    const wordsInfo = sequence.map(w => ({
+      id: w.id,
+      hanzi: w.hanzi,
+      pinyin: w.label,
+      translationLiteral: w.translation,
+      category: w.category
+    }));
+
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, wordsInfo }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha na resposta do servidor');
+      }
+
+      const data = await response.json();
+      setTranslation(data.translation);
+    } catch (err: any) {
+      console.error('Translation error:', err);
+      setTranslationError('Não foi possível obter a tradução automática no momento.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const addWord = (word: Word) => {
     setSequence([...sequence, word]);
+    setSearchQuery(''); // Clear the search query after selecting a word
+  };
+  const removeLast = () => setSequence(sequence.slice(0, -1));
+  const clearSequence = () => setSequence([]);
+
+  // Helper to check if a sequence of words forms a valid/complete sentence
+  const checkIsValid = (seq: Word[]) => {
+    if (seq.length === 0) return false;
+    const last = seq[seq.length - 1];
+
+    // If it ends with question particle 'ma'
+    if (last.id === 'ma') return true;
+
+    // If last is noun, country, suffix, adjective, number, thing
+    if (['noun', 'country', 'suffix', 'adjective', 'number', 'thing'].includes(last.category)) {
+      // Exception: baxi, jianada, putaoya need a suffix or noun
+      if (['baxi', 'jianada', 'putaoya'].includes(last.id)) return false;
+      if (last.id === 'nan' || last.id === 'nü') return false;
+      if (last.id === 'dianhua') return seq.some(w => w.id === 'da_call');
+      return true;
+    }
+
+    // If it's a verb, but NOT some auxiliary/transitive verbs requiring objects
+    if (last.category === 'verb') {
+      if (['shi', 'shuo', 'jiao', 'xihuan', 'zai', 'keyi', 'da_call', 'fa_verb', 'zhidao', 'he'].includes(last.id)) {
+        return false;
+      }
+      return true;
+      // 'zuo' (sentar), 'jin' (entrar) are valid intransitive endings!
+    }
+
+    // If ending in etiquette like xie xie
+    if (last.id === 'xie_xie') return true;
+
+    return false;
   };
 
-  const clear = () => setSequence([]);
+  // Filter words by search query for the palette
+  const filteredWords = useMemo(() => {
+    if (!searchQuery) return WORDS;
+    const q = searchQuery.toLowerCase().trim();
+    return WORDS.filter(w => 
+      w.label.toLowerCase().includes(q) || 
+      w.hanzi.includes(q) || 
+      w.translation.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
 
-  const removeLast = () => setSequence(sequence.slice(0, -1));
+  // --- Rule Logic ---
+  const availableWords = useMemo(() => {
+    const getBaseWords = (): Word[] => {
+      if (sequence.length === 0) {
+        // Começa com pronome ou etiqueta (ex: qing, xie xie)
+        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'etiquette');
+      }
 
-  const getCategoryColor = (category: Category) => {
+      const last = sequence[sequence.length - 1];
+      const prev = sequence.length > 1 ? sequence[sequence.length - 2] : null;
+      
+      // Find active verb in the sequence
+      const activeVerb = [...sequence].reverse().find(w => w.category === 'verb');
+      const verbExists = sequence.some(w => w.category === 'verb');
+      const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id));
+      const activePreposition = [...sequence].reverse().find(w => w.category === 'preposition');
+
+      // Case: Etiquette selected
+      if (last.category === 'etiquette') {
+        if (last.id === 'qing') {
+          // qing (por favor) can be followed by: zuo (sentar), he (beber), jin (entrar)
+          return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
+        }
+        if (last.id === 'xie_xie') {
+          // xie xie can be followed by pronoun (ex: xie xie ni)
+          return WORDS.filter(w => w.category === 'pronoun');
+        }
+        return [];
+      }
+
+      // Case: Preposition selected (ex: gei)
+      if (last.category === 'preposition') {
+        if (last.id === 'gei') {
+          // Must be followed by recipient (pronoun, noun)
+          return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun');
+        }
+        return [];
+      }
+
+      // Case: Pronoun selected (wo, ni, ta, zhe)
+      if (last.category === 'pronoun') {
+        // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
+        if (prev?.category === 'preposition' && prev.id === 'gei') {
+          // verbs suitable after gei + recipient: da_call, fa_verb, shuo
+          return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+        }
+
+        // If a verb exists in the sequence
+        if (verbExists) {
+          // Pronoun as Object
+          if (activeVerb?.id === 'xihuan') {
+            // After xihuan + pronoun: can end or take 'ma' (if not already question)
+            return WORDS.filter(w => {
+              if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+              return false;
+            });
+          }
+          
+          // General object pronoun
+          return WORDS.filter(w => {
+            if (['plural', 'possessive'].includes(w.category)) return true;
+            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+            return false;
+          });
+        } else {
+          // Pronoun as Subject
+          return WORDS.filter(w => {
+            // Can take: plural (except for 'zhe'), possessive 'de', adverb, verb, or adjective (sem verbo)
+            if (w.category === 'plural' && last.id !== 'zhe') return true;
+            if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
+            if (w.category === 'preposition') return true; // ex: wo gei ...
+            return false;
+          });
+        }
+      }
+
+      // Case: Plural selected (men)
+      if (last.category === 'plural') {
+        if (verbExists) {
+          return WORDS.filter(w => {
+            if (w.category === 'possessive') return true;
+            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+            return false;
+          });
+        } else {
+          return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category));
+        }
+      }
+
+      // Case: Possessive selected (de)
+      if (last.category === 'possessive') {
+        // Must be followed by noun, country, thing or adjective (compound)
+        return WORDS.filter(w => ['noun', 'country', 'thing', 'adjective'].includes(w.category));
+      }
+
+      // Case: Adverb selected (hen, bu, dou, ye, zhi)
+      if (last.category === 'adverb') {
+        if (last.id === 'hen') {
+          // 'hen' is used with adjectives for emphasis
+          return WORDS.filter(w => w.category === 'adjective');
+        }
+        if (last.id === 'bu') {
+          // 'bu' can negate verbs or adjectives
+          return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
+        }
+        // 'dou', 'ye', 'zhi' can go to verb or other adverbs (e.g. 'ye hen', 'dou hen', 'ye bu')
+        return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
+      }
+
+      // Case: Verb selected
+      if (last.category === 'verb') {
+        if (last.id === 'xihuan') {
+          const subjectPronoun = sequence.find(w => w.category === 'pronoun');
+          return WORDS.filter(w => {
+            if (w.category === 'thing') return true;
+            // Exclude subject pronoun to avoid "wo xihuan wo"
+            if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
+            return false;
+          });
+        }
+
+        if (last.id === 'shuo') {
+          // No nouns (mingzi, tongxue, laoshi) directly after shuo
+          return WORDS.filter(w => {
+            if (w.id === 'na' || w.id === 'shenme') return true;
+            if (w.category === 'country') {
+              // baxi and jianada don't form idioms, hide them
+              return !['baxi', 'jianada'].includes(w.id);
+            }
+            if (w.category === 'pronoun') return true;
+            return false;
+          });
+        }
+
+        if (last.id === 'jiao') {
+          return WORDS.filter(w => w.id === 'shenme' || w.category === 'noun' || w.category === 'pronoun');
+        }
+
+        if (last.id === 'zai') {
+          // zai can be followed by location questions (nali) or nouns of places (xuexiao, daxue)
+          return WORDS.filter(w => w.id === 'nali' || ['xuexiao', 'daxue', 'country'].includes(w.category));
+        }
+
+        if (last.id === 'keyi') {
+          // keyi (poder) can be followed by action verbs or preposition 'gei'
+          return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id) || w.id === 'gei');
+        }
+
+        if (last.id === 'da_call') {
+          // da (dial) -> dianhua (phone)
+          return WORDS.filter(w => w.id === 'dianhua');
+        }
+
+        if (last.id === 'fa_verb') {
+          // fa (send) -> youjian (email)
+          return WORDS.filter(w => w.id === 'youjian');
+        }
+
+        if (last.id === 'zhidao') {
+          // zhidao can take nouns/things/pronouns
+          return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question'].includes(w.category));
+        }
+
+        if (last.id === 'he') {
+          // he (drink) -> beverage things
+          return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
+        }
+
+        // Default verb output: can follow with nouns, countries, pronouns, questions
+        return WORDS.filter(w => {
+          if (['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id)) return true;
+          if (['noun', 'country', 'pronoun', 'thing'].includes(w.category)) return true;
+          return false;
+        });
+      }
+
+      // Case: Question particles
+      if (last.id === 'na' || last.id === 'shenme') {
+        return WORDS.filter(w => {
+          if (last.id === 'na' && w.id === 'guo') return true;
+          if (w.category === 'country' && activeVerb?.id === 'shuo') {
+            return !['baxi', 'jianada'].includes(w.id);
+          }
+          if (last.id === 'shenme' && w.id === 'mingzi') return true;
+          if (last.id === 'shenme' && w.id === 'gongzuo') return true;
+          return ['noun', 'country', 'thing'].includes(w.category);
+        });
+      }
+
+      // Case: Country selected
+      if (last.category === 'country') {
+        if (last.requiresGuo && activeVerb?.id === 'shi') {
+          return WORDS.filter(w => w.id === 'guo');
+        }
+        
+        return WORDS.filter(w => {
+          if (w.category !== 'suffix') return false;
+          const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
+
+          if (activeVerb?.id === 'shuo') {
+            return w.id === 'yu' && supportsLanguageSuffix;
+          }
+          if (activeVerb?.id === 'shi') {
+            return w.id === 'ren';
+          }
+          return true;
+        });
+      }
+
+      // Case: Guo selected
+      if (last.category === 'guo') {
+        return WORDS.filter(w => w.id === 'ren');
+      }
+
+      // Case: Suffix, Noun, Thing, Adjective, Number
+      if (
+        last.category === 'suffix' || 
+        last.category === 'noun' || 
+        last.category === 'thing' || 
+        last.category === 'adjective' ||
+        last.category === 'number'
+      ) {
+        // Sub-rules for nested noun compound combinations
+        if (prev?.category === 'preposition' && prev.id === 'gei') {
+          // verbs suitable after gei + recipient: da_call, fa_verb, shuo
+          return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+        }
+
+        if (last.id === 'nan' || last.id === 'nü') {
+          return WORDS.filter(w => w.id === 'pengyou');
+        }
+        if (last.id === 'dianhua') {
+          return WORDS.filter(w => w.id === 'haoma' || w.id === 'da_call');
+        }
+        if (last.id === 'haoma') {
+          return WORDS.filter(w => w.id === 'duoshao' || w.category === 'number' || w.id === 'shi');
+        }
+        if (last.id === 'gongzuo') {
+          return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
+        }
+
+        // If we are stating a phone number
+        if (last.category === 'number') {
+          return WORDS.filter(w => w.category === 'number' || w.id === 'ma');
+        }
+
+        // General endings
+        const isComposto = sequence.some(w => w.category === 'possessive');
+        if (!verbExists && isComposto && last.category !== 'adjective') {
+          return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
+        }
+
+        // Questions are final, but can have 'ma' if not a question already
+        if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
+          return WORDS.filter(w => w.id === 'ma');
+        }
+
+        return [];
+      }
+
+      return [];
+    };
+
+    const baseWords = getBaseWords();
+
+    // Leave question particles (like 'ma') available after standard complete sentence is formed
+    if (checkIsValid(sequence)) {
+      const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id));
+      const hasMa = sequence.some(w => w.id === 'ma');
+      if (!hasQuestion && !hasMa) {
+        const maWord = WORDS.find(w => w.id === 'ma');
+        if (maWord && !baseWords.some(w => w.id === 'ma')) {
+          return [...baseWords, maWord];
+        }
+      }
+    }
+
+    return baseWords;
+  }, [sequence]);
+
+  // Helper to check if sequence forms a complete/valid clause
+  const isValidSentence = useMemo(() => {
+    return checkIsValid(sequence);
+  }, [sequence]);
+
+  // Check if word is clickable (available to select)
+  const isWordClickable = (word: Word) => {
+    return availableWords.some(w => w.id === word.id);
+  };
+
+  // Get background color for categories
+  const getCategoryBg = (category: string) => {
     switch (category) {
       case 'pronoun': return 'bg-blue-50';
-      case 'verb': return 'bg-red-50';
-      case 'country': return 'bg-emerald-50';
-      case 'adverb': return 'bg-amber-50';
+      case 'verb': return 'bg-green-50';
+      case 'adverb': return 'bg-yellow-50';
       case 'question': return 'bg-purple-50';
-      case 'noun': return 'bg-slate-50';
-      case 'suffix': return 'bg-pink-50';
-      case 'guo': return 'bg-cyan-50';
+      case 'noun': return 'bg-amber-50';
+      case 'country': return 'bg-teal-50';
       case 'plural': return 'bg-indigo-50';
       case 'possessive': return 'bg-rose-100';
       case 'thing': return 'bg-orange-50';
@@ -443,176 +568,256 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#141414] font-sans p-4 md:p-8 flex flex-col gap-8">
-      {/* Header */}
-      <header className="flex justify-between items-center bg-white p-6 rounded-[32px] shadow-sm border border-black/5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-[#00FF00]">
-            <MessageSquare size={28} />
+    <div className="min-h-screen bg-slate-900 text-white font-sans p-4 md:p-8 flex flex-col items-center justify-center">
+      {/* Main App Container */}
+      <div className="w-full max-w-4xl bg-white text-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 border border-slate-100">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md">
+              <MessageSquare className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
+              <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.7</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
-            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.7</p>
-          </div>
+          <button 
+            onClick={clearSequence}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Limpar
+          </button>
         </div>
-        <button 
-          onClick={clear}
-          className="p-3 hover:bg-black hover:text-white rounded-full transition-all duration-200 border border-black/20"
-          title="Limpar frase"
-        >
-          <Trash2 size={24} />
-        </button>
-      </header>
 
-      {/* Main UI Area */}
-      <main className="flex-1 flex flex-col gap-12 max-w-4xl mx-auto w-full">
-        
-        {/* Step Indicators / Action Buttons */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Elementos Disponíveis</span>
-            <div className="h-[1px] flex-1 bg-black/5" />
-          </div>
-          
-          <div className="flex flex-wrap gap-4 justify-center">
-            {availableWords.length > 0 ? (
+        {/* Active Sequence Board */}
+        <div className="bg-slate-50 rounded-2xl p-5 md:p-6 border border-slate-100/80 min-h-[140px] flex flex-col justify-between relative overflow-hidden group">
+          {sequence.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center text-slate-400">
+              <Sparkles className="w-8 h-8 text-indigo-400/60 mb-2 animate-pulse" />
+              <p className="text-sm font-medium">Toque nas palavras abaixo para construir uma frase</p>
+              <p className="text-xs text-slate-400/80 mt-1">A gramática mandarim será validada em tempo real</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2.5 items-center">
               <AnimatePresence mode="popLayout">
-                {availableWords.map((word) => {
+                {sequence.map((word, idx) => {
                   const Icon = word.icon;
-                  const bgColor = getCategoryColor(word.category);
-                  return (
-                    <motion.button
-                      key={word.id}
-                      initial={{ scale: 0.8, opacity: 0, y: 20 }}
-                      animate={{ scale: 1, opacity: 1, y: 0 }}
-                      exit={{ scale: 0.8, opacity: 0, y: -20 }}
-                      whileHover={{ y: -8, scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => addWord(word)}
-                      className={`flex flex-col items-center justify-center p-3 w-16 h-16 sm:w-24 sm:h-24 ${bgColor} border-2 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-transform group`}
-                    >
-                      <span className="text-lg sm:text-xl font-bold leading-none mb-1 group-hover:scale-110 transition-transform">{word.hanzi}</span>
-                      <span className="text-[9px] font-bold uppercase text-center leading-tight tracking-wider">{word.label}</span>
-                      <span className="text-[8px] opacity-40 font-medium text-center leading-tight">({word.translation})</span>
-                    </motion.button>
-                  );
-                })}
-              </AnimatePresence>
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center gap-6 text-center py-12 px-8 bg-white border-4 border-black rounded-[48px] shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-w-sm mx-auto"
-              >
-                <div className="w-20 h-20 bg-[#00FF00] border-4 border-black rounded-full flex items-center justify-center -mt-20 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                  <ArrowRight size={40} />
-                </div>
-                <div>
-                  <p className="font-display text-3xl uppercase leading-none mb-2">Frase terminada</p>
-                  <p className="text-xs text-black/50 font-medium px-4 leading-relaxed">Você seguiu todas as regras gramaticais com sucesso.</p>
-                </div>
-                <button 
-                  onClick={clear}
-                  className="w-full py-4 bg-black text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-[#00FF00] hover:text-black transition-colors"
-                >
-                  Recomeçar Jornada
-                </button>
-              </motion.div>
-            )}
-          </div>
-        </section>
-
-        {/* Sentence Carousel */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-black/20" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Sequência Construída</span>
-            <div className="h-[1px] flex-1 bg-black/5" />
-          </div>
-
-          <div className="bg-white/40 border-2 border-dashed border-black/10 rounded-[48px] p-10 min-h-[220px] flex items-center overflow-x-auto relative">
-            <div className="flex gap-6 mx-auto snap-x">
-              <AnimatePresence mode="popLayout">
-                {sequence.map((word, index) => {
-                  const Icon = word.icon;
-                  const bgColor = getCategoryColor(word.category);
                   return (
                     <motion.div
-                      key={`${word.id}-${index}`}
+                      key={`${word.id}-${idx}`}
                       layout
-                      initial={{ scale: 0, x: 100 }}
-                      animate={{ scale: 1, x: 0 }}
-                      exit={{ scale: 0, x: -100 }}
-                      className="flex flex-col items-center gap-3 group relative snap-center"
+                      initial={{ opacity: 0, scale: 0.8, y: 15 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: -15 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/60 shadow-sm cursor-pointer select-none transition-all ${getCategoryBg(word.category)} hover:scale-105`}
+                      onClick={idx === sequence.length - 1 ? removeLast : undefined}
                     >
-                      <div className={`w-20 h-28 sm:w-28 sm:h-36 ${bgColor} border-2 border-black rounded-3xl flex flex-col items-center justify-center shadow-xl transform group-hover:-rotate-3 transition-transform relative overflow-hidden`}>
-                        <div className="absolute top-2 right-2 opacity-10">
-                          <Icon size={40} />
-                        </div>
-                        <span className="text-3xl sm:text-4xl font-bold relative z-10">{word.hanzi}</span>
-                        <span className="text-xs font-display uppercase mt-3 tracking-tight relative z-10">{word.label}</span>
-                        <span className="text-[10px] font-medium opacity-50 relative z-10">({word.translation})</span>
-                        <div className="absolute bottom-0 inset-x-0 h-1 bg-black/5" />
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className="px-2 py-0.5 bg-black text-white text-[8px] font-mono rounded-full">{index + 1}</div>
-                        <span className="text-[8px] font-bold uppercase opacity-30 tracking-widest">{word.category}</span>
-                      </div>
-                      
-                      {index === sequence.length - 1 && (
-                        <button 
-                          onClick={removeLast}
-                          className="absolute -top-3 -right-3 bg-white text-red-500 hover:bg-black p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-black z-20"
-                        >
-                          <XCircle size={18} />
-                        </button>
+                      <span className="font-mono text-[10px] text-slate-400 font-semibold">{word.label}</span>
+                      <span className="font-semibold text-sm">{word.hanzi}</span>
+                      {idx === sequence.length - 1 && (
+                        <X className="w-3 h-3 text-slate-400 hover:text-red-500 ml-0.5" />
                       )}
                     </motion.div>
                   );
                 })}
-                {sequence.length === 0 && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center gap-4 text-black/10 text-center select-none"
-                  >
-                    <PlusSquare size={48} strokeWidth={1} />
-                    <p className="font-display text-4xl uppercase tracking-tighter opacity-50">Sua frase aqui</p>
-                  </motion.div>
-                )}
               </AnimatePresence>
             </div>
+          )}
+
+          {/* Live Validation Indicator */}
+          {sequence.length > 0 && (
+            <div className="flex items-center justify-between border-t border-slate-100/80 pt-4 mt-4">
+              <div className="flex items-center gap-2">
+                {isValidSentence ? (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Gramática Correta
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100 animate-pulse">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    Frase Incompleta
+                  </div>
+                )}
+              </div>
+
+              <button 
+                onClick={clearSequence}
+                className="p-1 rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Limpar frase"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Translation Panel */}
+        {sequence.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100/60 flex flex-col gap-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-indigo-700">
+                <Globe className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-wider">Tradução</span>
+              </div>
+              
+              <button
+                onClick={handleTranslate}
+                disabled={isTranslating}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wider shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {isTranslating ? 'Traduzindo...' : 'Traduzir com IA'}
+              </button>
+            </div>
+
+            <div className="min-h-[2rem] flex items-center">
+              {isTranslating ? (
+                <div className="flex items-center gap-1.5 text-xs text-indigo-500 font-semibold uppercase tracking-wider animate-pulse">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+                  </span>
+                  Traduzindo frase com IA...
+                </div>
+              ) : translationError ? (
+                <div className="flex flex-col gap-1 w-full">
+                  <p className="text-lg font-medium text-slate-700">
+                    {sequence.map(w => w.translation).join(' ')}
+                  </p>
+                  <span className="text-[10px] text-amber-600 bg-amber-50 self-start px-2 py-0.5 rounded-full font-semibold border border-amber-100">
+                    Tradução Literal (Erro na API do Tradutor)
+                  </span>
+                </div>
+              ) : translation ? (
+                <div className="flex flex-col gap-1 w-full">
+                  <p className="text-lg font-semibold text-indigo-900 transition-all duration-300">
+                    {translation}
+                  </p>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 self-start px-2 py-0.5 rounded-full font-semibold border border-emerald-100">
+                    Tradução por Inteligência Artificial
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 w-full">
+                  <p className="text-lg font-medium text-slate-700 transition-all duration-300">
+                    {sequence.map(w => w.translation).join(' ')}
+                  </p>
+                  <span className="text-[10px] text-slate-500 bg-slate-100 self-start px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
+                    Tradução Literal (Aguardando Tradução com IA)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-indigo-100/50 pt-2.5 mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+              <div>
+                <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block">Pinyin</span>
+                <span className="font-mono text-[11px] text-indigo-600 font-semibold">
+                  {sequence.map(w => w.label).join(' ')}
+                </span>
+              </div>
+              
+              {/* Only show literal translation row if the AI translation is NOT available */}
+              {!translation && (
+                <div>
+                  <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block">Tradução Literal</span>
+                  <span className="text-slate-600 font-medium">
+                    {sequence.map(w => w.translation).join(' ')}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </section>
+        )}
 
-      </main>
-
-      {/* Footer / Info */}
-      <footer className="text-center p-12 border-t border-black/5 mt-12 bg-white/30 rounded-t-[64px]">
-        <div className="max-w-2xl mx-auto space-y-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Regras de Sintaxe</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-[8px] font-bold uppercase tracking-widest text-black/50">
-            <div className="p-3 bg-white rounded-xl border border-black/5 shadow-sm">
-              <div className="mb-2 text-black">1. Pronome</div>
-              Na posição inicial
-            </div>
-            <div className="p-3 bg-white rounded-xl border border-black/5 shadow-sm">
-              <div className="mb-2 text-black">2. Advérbio</div>
-              Precede o verbo
-            </div>
-            <div className="p-3 bg-white rounded-xl border border-black/5 shadow-sm">
-              <div className="mb-2 text-black">3. Verbo</div>
-              Define o gentílico
-            </div>
-            <div className="p-3 bg-white rounded-xl border border-black/5 shadow-sm">
-              <div className="mb-2 text-black">4. Interrogação</div>
-              Final ou Poscrita
-            </div>
+        {/* Prominent Search Bar Section */}
+        <div className="bg-slate-50 hover:bg-slate-100/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 border-2 border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2">
+            <Search className="w-5 h-5 text-indigo-600" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pesquisar Pinyins Disponíveis</span>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Digite o pinyin, ideograma (hanzi) ou tradução em português..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-4 pr-10 py-3 text-sm bg-white text-slate-800 rounded-xl border border-slate-200/80 focus:border-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
-      </footer>
+
+        {/* Word Palette Board */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 text-slate-500 font-medium">
+            <PlusSquare className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
+          </div>
+
+          {filteredWords.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <p className="text-xs font-medium">Nenhuma palavra encontrada para "{searchQuery}"</p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-1.5 underline cursor-pointer"
+              >
+                Limpar pesquisa
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1">
+              {filteredWords.map(word => {
+                const Icon = word.icon;
+                const clickable = isWordClickable(word);
+                return (
+                  <button
+                    key={word.id}
+                    onClick={() => clickable && addWord(word)}
+                    disabled={!clickable}
+                    className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
+                      clickable 
+                        ? `${getCategoryBg(word.category)} border-slate-200/80 text-slate-700 hover:scale-[102%] hover:shadow-md active:scale-95 cursor-pointer` 
+                        : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-xl ${clickable ? 'bg-white shadow-sm text-slate-600' : 'text-slate-300'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 font-bold leading-none">{word.label}</span>
+                      <span className="font-semibold text-sm truncate mt-0.5">{word.hanzi}</span>
+                      <span className="text-[10px] text-slate-400 truncate leading-none mt-0.5">{word.translation}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Grammar Help Panel */}
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 text-xs text-slate-500 flex flex-col gap-1.5">
+          <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Dicas Rápidas de Gramática:</span>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Para fazer perguntas de sim/não, adicione a partícula de pergunta <strong className="text-indigo-600">ma (吗)</strong> no final.</li>
+            <li>A preposição <strong className="text-indigo-600">gei (给 - para...)</strong> é usada antes do destinatário e do verbo (ex: <strong className="font-mono text-[11px] text-indigo-700">wo gei ni da dianhua</strong> = eu te ligo).</li>
+            <li>Para o verbo <strong className="text-indigo-600">jiao (叫 - chamar-se)</strong>, use a sequência: Sujeito + jiao + nome.</li>
+            <li>Nomes de países que requerem sufixo usam <strong className="text-indigo-600">guo (国)</strong> (ex: <strong className="font-mono text-[11px] text-indigo-700">fa guo</strong> = França).</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
