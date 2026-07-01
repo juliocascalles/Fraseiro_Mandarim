@@ -13,8 +13,23 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// --- Types ---
-type Category = 'pronoun' | 'plural' | 'adverb' | 'verb' | 'country' | 'suffix' | 'noun' | 'question' | 'guo' | 'possessive' | 'thing';
+/// --- Types ---
+type Category = 
+  | 'pronoun' 
+  | 'plural' 
+  | 'adverb' 
+  | 'verb' 
+  | 'country' 
+  | 'suffix' 
+  | 'noun' 
+  | 'question' 
+  | 'guo' 
+  | 'possessive' 
+  | 'thing'
+  | 'adjective'
+  | 'number'
+  | 'preposition'
+  | 'etiquette';
 
 interface Word {
   id: string;
@@ -32,6 +47,7 @@ const WORDS: Word[] = [
   { id: 'wo', label: 'wo', hanzi: '我', translation: 'eu', category: 'pronoun', icon: User },
   { id: 'ni', label: 'ni', hanzi: '你', translation: 'você', category: 'pronoun', icon: User },
   { id: 'ta', label: 'ta', hanzi: '他', translation: 'ele/ela', category: 'pronoun', icon: User },
+  { id: 'zhe', label: 'zhe', hanzi: '这', translation: 'este/isto', category: 'pronoun', icon: ArrowRight },
   
   // Plural
   { id: 'men', label: 'men', hanzi: '们', translation: 'plural', category: 'plural', icon: Users },
@@ -40,21 +56,36 @@ const WORDS: Word[] = [
   { id: 'de', label: 'de', hanzi: '的', translation: 'de (posse)', category: 'possessive', icon: Tag },
 
   // Adverbs
-  { id: 'dou', label: 'dou', hanzi: '都', translation: 'todos', category: 'adverb', icon: PlusSquare }, // todos
-  { id: 'ye', label: 'ye', hanzi: '也', translation: 'também', category: 'adverb', icon: RefreshCcw }, // também
-  { id: 'bu', label: 'bù', hanzi: '不', translation: 'não', category: 'adverb', icon: XCircle }, // não
-  { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target }, // apenas
+  { id: 'dou', label: 'dou', hanzi: '都', translation: 'todos', category: 'adverb', icon: PlusSquare },
+  { id: 'ye', label: 'ye', hanzi: '也', translation: 'também', category: 'adverb', icon: RefreshCcw },
+  { id: 'bu', label: 'bù', hanzi: '不', translation: 'não', category: 'adverb', icon: XCircle },
+  { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target },
+  { id: 'hen', label: 'hen', hanzi: '很', translation: 'muito', category: 'adverb', icon: PlusSquare },
   
+  // Prepositions
+  { id: 'gei', label: 'gei', hanzi: '给', translation: 'para', category: 'preposition', icon: Tag },
+
   // Verbs
-  { id: 'shi', label: 'shi', hanzi: '是', translation: 'ser', category: 'verb', icon: UserCheck }, // ser
-  { id: 'shuo', label: 'shuo', hanzi: '说', translation: 'falar', category: 'verb', icon: MessageSquare }, // falar
-  { id: 'jiao', label: 'jiao', hanzi: '叫', translation: 'chamar-se', category: 'verb', icon: Tag }, // chamar
+  { id: 'shi', label: 'shi', hanzi: '是', translation: 'ser', category: 'verb', icon: UserCheck },
+  { id: 'shuo', label: 'shuo', hanzi: '说', translation: 'falar', category: 'verb', icon: MessageSquare },
+  { id: 'jiao', label: 'jiao', hanzi: '叫', translation: 'chamar-se', category: 'verb', icon: Tag },
   { id: 'xihuan', label: 'xihuan', hanzi: '喜欢', translation: 'gostar', category: 'verb', icon: Target },
+  { id: 'zai', label: 'zai', hanzi: '在', translation: 'estar/em', category: 'verb', icon: Target },
+  { id: 'keyi', label: 'ke yi', hanzi: '可以', translation: 'poder', category: 'verb', icon: UserCheck },
+  { id: 'da_call', label: 'da', hanzi: '打', translation: 'ligar (fone)', category: 'verb', icon: MessageSquare },
+  { id: 'fa_verb', label: 'fa', hanzi: '发', translation: 'enviar', category: 'verb', icon: PlusSquare },
+  { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber/conhecer', category: 'verb', icon: FileText },
+  { id: 'zuo', label: 'zuo', hanzi: '坐', translation: 'sentar', category: 'verb', icon: UserCheck },
+  { id: 'he', label: 'he', hanzi: '喝', translation: 'beber', category: 'verb', icon: Coffee },
+  { id: 'jin', label: 'jin', hanzi: '进', translation: 'entrar', category: 'verb', icon: ArrowRight },
 
   // Questions
-  { id: 'ma', label: 'ma', hanzi: '吗', translation: '?', category: 'question', icon: HelpCircle }, // end particle
-  { id: 'na', label: 'na', hanzi: '哪', translation: 'qual', category: 'question', icon: Search }, // qual?
-  { id: 'shenme', label: 'shenme', hanzi: '什么', translation: 'o quê', category: 'question', icon: Info }, // que?
+  { id: 'ma', label: 'ma', hanzi: '吗', translation: '?', category: 'question', icon: HelpCircle },
+  { id: 'na', label: 'na', hanzi: '哪', translation: 'qual', category: 'question', icon: Search },
+  { id: 'shenme', label: 'shenme', hanzi: '什么', translation: 'o quê', category: 'question', icon: Info },
+  { id: 'duoshao', label: 'duoshao', hanzi: 'duo shao', translation: 'quanto?', category: 'question', icon: HelpCircle },
+  { id: 'nali', label: 'nali', hanzi: '哪里', translation: 'onde?', category: 'question', icon: Search },
+  { id: 'zenmeyang', label: 'zenmeyang', hanzi: '怎么样', translation: 'como é...?', category: 'question', icon: HelpCircle },
 
   // Countries
   { id: 'baxi', label: 'baxi', hanzi: '巴西', translation: 'Brasil', category: 'country', icon: Globe },
@@ -65,13 +96,24 @@ const WORDS: Word[] = [
 
   // Gentilics parts
   { id: 'guo', label: 'guo', hanzi: '国', translation: 'país', category: 'guo', icon: Flag },
-  { id: 'yu', label: 'yu', hanzi: '语', translation: 'idioma', category: 'suffix', icon: Type }, // idioma
-  { id: 'ren', label: 'ren', hanzi: '人', translation: 'pessoa', category: 'suffix', icon: Users }, // nacionalidade
+  { id: 'yu', label: 'yu', hanzi: '语', translation: 'idioma', category: 'suffix', icon: Type },
+  { id: 'ren', label: 'ren', hanzi: '人', translation: 'pessoa', category: 'suffix', icon: Users },
 
   // Nouns
   { id: 'mingzi', label: 'ming zi', hanzi: '名字', translation: 'nome', category: 'noun', icon: FileText },
   { id: 'tongxue', label: 'tongxue', hanzi: '同学', translation: 'colega', category: 'noun', icon: GraduationCap },
   { id: 'laoshi', label: 'laoshi', hanzi: '老师', translation: 'professor', category: 'noun', icon: Briefcase },
+  { id: 'gongzuo', label: 'gongzuo', hanzi: '工作', translation: 'trabalho', category: 'noun', icon: Briefcase },
+  { id: 'pengyou', label: 'pengyou', hanzi: '朋友', translation: 'amigo(a)', category: 'noun', icon: Users },
+  { id: 'nan', label: 'nan', hanzi: '男', translation: 'masculino', category: 'noun', icon: User },
+  { id: 'nü', label: 'nü', hanzi: '女', translation: 'feminino', category: 'noun', icon: User },
+  { id: 'haoma', label: 'haoma', hanzi: '号码', translation: 'número', category: 'noun', icon: FileText },
+  { id: 'dianhua', label: 'dianhua', hanzi: '电话', translation: 'telefone', category: 'noun', icon: Briefcase },
+  { id: 'youjian', label: 'youjian', hanzi: '邮件', translation: 'email', category: 'noun', icon: FileText },
+  { id: 'xuesheng', label: 'xuesheng', hanzi: '学生', translation: 'estudante', category: 'noun', icon: GraduationCap },
+  { id: 'xuexiao', label: 'xuexiao', hanzi: '学校', translation: 'escola', category: 'noun', icon: Book },
+  { id: 'daxue', label: 'daxue', hanzi: '大学', translation: 'universidade', category: 'noun', icon: GraduationCap },
+  { id: 'Huawei', label: 'Huawei', hanzi: '华为', translation: 'Huawei', category: 'noun', icon: Briefcase },
 
   // Things (Coisas)
   { id: 'shu', label: 'shu', hanzi: '书', translation: 'livro', category: 'thing', icon: Book },
@@ -81,8 +123,34 @@ const WORDS: Word[] = [
   { id: 'cha', label: 'cha', hanzi: '茶', translation: 'chá', category: 'thing', icon: CupSoda },
   { id: 'kafei', label: 'kafei', hanzi: '咖啡', translation: 'café', category: 'thing', icon: Coffee },
   { id: 'mifan', label: 'mifan', hanzi: '米饭', translation: 'arroz', category: 'thing', icon: Utensils },
-  { id: 'mianbao', label: 'mianbao', hanzi: '面包', translation: 'pão', category: 'thing', icon: Milk }, // Using Milk as bread placeholder or similar
+  { id: 'mianbao', label: 'mianbao', hanzi: '面包', translation: 'pão', category: 'thing', icon: Milk },
   { id: 'tang', label: 'tang', hanzi: '汤', translation: 'sopa', category: 'thing', icon: Soup },
+
+  // Adjectives
+  { id: 'da_adj', label: 'dà', hanzi: '大', translation: 'grande', category: 'adjective', icon: Tag },
+  { id: 'xiao', label: 'xiao', hanzi: 'xiao', translation: 'pequeno', category: 'adjective', icon: Tag },
+  { id: 'gaoxing', label: 'gaoxing', hanzi: '高兴', translation: 'feliz', category: 'adjective', icon: UserCheck },
+  { id: 'mang', label: 'mang', hanzi: '忙', translation: 'ocupado', category: 'adjective', icon: Briefcase },
+  { id: 'lei', label: 'lei', hanzi: '累', translation: 'cansado', category: 'adjective', icon: Briefcase },
+  { id: 'congming', label: 'congming', hanzi: '聪明', translation: 'inteligente', category: 'adjective', icon: GraduationCap },
+  { id: 'piaoliang', label: 'piaoliang', hanzi: '漂亮', translation: 'bonito(a)', category: 'adjective', icon: Tag },
+  { id: 'shuai', label: 'shuai', hanzi: '帅', translation: 'bonito (homem)', category: 'adjective', icon: User },
+
+  // Numbers
+  { id: 'yao', label: 'yao', hanzi: '幺', translation: '1', category: 'number', icon: Type },
+  { id: 'er', label: 'er', hanzi: '二', translation: '2', category: 'number', icon: Type },
+  { id: 'san', label: 'san', hanzi: '三', translation: '3', category: 'number', icon: Type },
+  { id: 'si', label: 'si', hanzi: '四', translation: '4', category: 'number', icon: Type },
+  { id: 'wu', label: 'wu', hanzi: '五', translation: '5', category: 'number', icon: Type },
+  { id: 'liu', label: 'liu', hanzi: '六', translation: '6', category: 'number', icon: Type },
+  { id: 'qi', label: 'qi', hanzi: '七', translation: '7', category: 'number', icon: Type },
+  { id: 'ba', label: 'ba', hanzi: '八', translation: '8', category: 'number', icon: Type },
+  { id: 'jiu', label: 'jiu', hanzi: '九', translation: '9', category: 'number', icon: Type },
+  { id: 'ling', label: 'ling', hanzi: '零', translation: '0', category: 'number', icon: Type },
+
+  // Etiquette
+  { id: 'qing', label: 'qing', hanzi: '请', translation: 'por favor', category: 'etiquette', icon: UserCheck },
+  { id: 'xie_xie', label: 'xie xie', hanzi: '谢谢', translation: 'obrigado', category: 'etiquette', icon: UserCheck },
 ];
 
 export default function App() {
@@ -91,79 +159,129 @@ export default function App() {
   // --- Rule Logic ---
   const availableWords = useMemo(() => {
     if (sequence.length === 0) {
-      // 2 - A frase deve começar sempre com um pronome
-      return WORDS.filter(w => w.category === 'pronoun');
+      // Começa com pronome ou etiqueta (ex: qing, xie xie)
+      return WORDS.filter(w => w.category === 'pronoun' || w.category === 'etiquette');
     }
 
     const last = sequence[sequence.length - 1];
     const prev = sequence.length > 1 ? sequence[sequence.length - 2] : null;
     
-    // Find active verb in the sequence for rule 10 and 11
+    // Find active verb in the sequence
     const activeVerb = [...sequence].reverse().find(w => w.category === 'verb');
+    const verbExists = sequence.some(w => w.category === 'verb');
+    const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id));
+    const activePreposition = [...sequence].reverse().find(w => w.category === 'preposition');
 
-    // Rule 2/3 - Pronoun selected
+    // Case: Etiquette selected
+    if (last.category === 'etiquette') {
+      if (last.id === 'qing') {
+        // qing (por favor) can be followed by: zuo (sentar), he (beber), jin (entrar)
+        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
+      }
+      if (last.id === 'xie_xie') {
+        // xie xie can be followed by pronoun (ex: xie xie ni)
+        return WORDS.filter(w => w.category === 'pronoun');
+      }
+      return [];
+    }
+
+    // Case: Preposition selected (ex: gei)
+    if (last.category === 'preposition') {
+      if (last.id === 'gei') {
+        // Must be followed by recipient (pronoun, noun)
+        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun');
+      }
+      return [];
+    }
+
+    // Case: Pronoun selected (wo, ni, ta, zhe)
     if (last.category === 'pronoun') {
-      const verbExists = sequence.some(w => w.category === 'verb');
-      if (!verbExists) {
-        // Pronoun as Subject
-        return WORDS.filter(w => ['plural', 'possessive', 'adverb', 'verb'].includes(w.category));
-      } else {
+      // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
+      if (prev?.category === 'preposition' && prev.id === 'gei') {
+        // verbs suitable after gei + recipient: da_call, fa_verb, shuo
+        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+      }
+
+      // If a verb exists in the sequence
+      if (verbExists) {
         // Pronoun as Object
-        const hasQuestion = sequence.some(w => ['na', 'shenme'].includes(w.id));
+        if (activeVerb?.id === 'xihuan') {
+          // After xihuan + pronoun: can end or take 'ma' (if not already question)
+          return WORDS.filter(w => {
+            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+            return false;
+          });
+        }
+        
+        // General object pronoun
         return WORDS.filter(w => {
           if (['plural', 'possessive'].includes(w.category)) return true;
           if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
           return false;
         });
+      } else {
+        // Pronoun as Subject
+        return WORDS.filter(w => {
+          // Can take: plural (except for 'zhe'), possessive 'de', adverb, verb, or adjective (sem verbo)
+          if (w.category === 'plural' && last.id !== 'zhe') return true;
+          if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
+          if (w.category === 'preposition') return true; // ex: wo gei ...
+          return false;
+        });
       }
     }
 
-    // Rule 3/4 - Plural selected
+    // Case: Plural selected (men)
     if (last.category === 'plural') {
-      const verbExists = sequence.some(w => w.category === 'verb');
-      if (!verbExists) {
-        return WORDS.filter(w => ['possessive', 'adverb', 'verb'].includes(w.category));
-      } else {
-        // Object plural
-        const hasQuestion = sequence.some(w => ['na', 'shenme'].includes(w.id));
+      if (verbExists) {
         return WORDS.filter(w => {
           if (w.category === 'possessive') return true;
           if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
           return false;
         });
+      } else {
+        return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category));
       }
     }
 
-    // Rule 3 - Possessive selected
+    // Case: Possessive selected (de)
     if (last.category === 'possessive') {
-      // After 'de', must come a noun or thing to form a compound
-      return WORDS.filter(w => ['noun', 'country', 'thing'].includes(w.category));
+      // Must be followed by noun, country, thing or adjective (compound)
+      return WORDS.filter(w => ['noun', 'country', 'thing', 'adjective'].includes(w.category));
     }
 
-    // Rule 5 - After adverb must come a verb
+    // Case: Adverb selected (hen, bu, dou, ye, zhi)
     if (last.category === 'adverb') {
-      return WORDS.filter(w => w.category === 'verb');
+      if (last.id === 'hen') {
+        // 'hen' is used with adjectives for emphasis
+        return WORDS.filter(w => w.category === 'adjective');
+      }
+      if (last.id === 'bu') {
+        // 'bu' can negate verbs or adjectives
+        return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
+      }
+      // 'dou', 'ye', 'zhi' can go to verb or other adverbs (e.g. 'ye hen', 'dou hen', 'ye bu')
+      return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
     }
 
-    // Rule 6/8 - Verb selected
+    // Case: Verb selected
     if (last.category === 'verb') {
-      // Logic fix: After 'xihuan', only 'thing' and 'pronoun' are allowed
       if (last.id === 'xihuan') {
         const subjectPronoun = sequence.find(w => w.category === 'pronoun');
         return WORDS.filter(w => {
           if (w.category === 'thing') return true;
-          // Exclude the subject pronoun to avoid "wo xihuan wo"
-          if (w.category === 'pronoun' && w.id !== subjectPronoun?.id) return true;
+          // Exclude subject pronoun to avoid "wo xihuan wo"
+          if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
           return false;
         });
       }
 
-      // Logic fix: No nouns after 'shuo' (falar)
       if (last.id === 'shuo') {
+        // No nouns (mingzi, tongxue, laoshi) directly after shuo
         return WORDS.filter(w => {
           if (w.id === 'na' || w.id === 'shenme') return true;
           if (w.category === 'country') {
-            // Logic fix (new): baxi and jianada don't form idioms, hide them after 'shuo'
+            // baxi and jianada don't form idioms, hide them
             return !['baxi', 'jianada'].includes(w.id);
           }
           if (w.category === 'pronoun') return true;
@@ -171,43 +289,69 @@ export default function App() {
         });
       }
 
-      // Can follow with: substantivo, pronome composto, na/shenme
+      if (last.id === 'jiao') {
+        return WORDS.filter(w => w.id === 'shenme' || w.category === 'noun' || w.category === 'pronoun');
+      }
+
+      if (last.id === 'zai') {
+        // zai can be followed by location questions (nali) or nouns of places (xuexiao, daxue)
+        return WORDS.filter(w => w.id === 'nali' || ['xuexiao', 'daxue', 'country'].includes(w.category));
+      }
+
+      if (last.id === 'keyi') {
+        // keyi (poder) can be followed by action verbs
+        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
+      }
+
+      if (last.id === 'da_call') {
+        // da (dial) -> dianhua (phone)
+        return WORDS.filter(w => w.id === 'dianhua');
+      }
+
+      if (last.id === 'fa_verb') {
+        // fa (send) -> youjian (email)
+        return WORDS.filter(w => w.id === 'youjian');
+      }
+
+      if (last.id === 'zhidao') {
+        // zhidao can take nouns/things/pronouns
+        return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question'].includes(w.category));
+      }
+
+      if (last.id === 'he') {
+        // he (drink) -> beverage things
+        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
+      }
+
+      // Default verb output: can follow with nouns, countries, pronouns, questions
       return WORDS.filter(w => {
-        // Particles na and shenme
-        if (w.id === 'na' || w.id === 'shenme') return true;
-        // Substantivo or Country
-        if (['noun', 'country'].includes(w.category)) return true;
-        // Pronome (to start a "composto" if allowed by rule 6)
-        if (w.category === 'pronoun') return true;
+        if (['na', 'shenme', 'duoshao', 'nali', 'zenmeyang'].includes(w.id)) return true;
+        if (['noun', 'country', 'pronoun', 'thing'].includes(w.category)) return true;
         return false;
       });
     }
 
-    // Rule 8 - Question particles na/shenme selected
+    // Case: Question particles
     if (last.id === 'na' || last.id === 'shenme') {
-      // Logic fix: Enable 'guo' after 'na' for "na guo ren"
       return WORDS.filter(w => {
         if (last.id === 'na' && w.id === 'guo') return true;
         if (w.category === 'country' && activeVerb?.id === 'shuo') {
-          // Logic fix (new): baxi and jianada don't form idioms, hide them in question path too
           return !['baxi', 'jianada'].includes(w.id);
         }
-        return ['noun', 'country'].includes(w.category);
+        if (last.id === 'shenme' && w.id === 'mingzi') return true;
+        if (last.id === 'shenme' && w.id === 'gongzuo') return true;
+        return ['noun', 'country', 'thing'].includes(w.category);
       });
     }
 
-    // Rule 9/12 - Country selected
+    // Case: Country selected
     if (last.category === 'country') {
-      // Logic fix (a): 'guo' is ONLY for nationalities (shi) in specific countries
       if (last.requiresGuo && activeVerb?.id === 'shi') {
         return WORDS.filter(w => w.id === 'guo');
       }
       
-      // Rule 10/11: Filter suffix by verb
       return WORDS.filter(w => {
         if (w.category !== 'suffix') return false;
-
-        // Logic fix (new): Brazil and Canada don't have a '-yu' (language) form
         const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
 
         if (activeVerb?.id === 'shuo') {
@@ -220,29 +364,49 @@ export default function App() {
       });
     }
 
-    // Rule 12 - Guo selected
+    // Case: Guo selected
     if (last.category === 'guo') {
-      return WORDS.filter(w => {
-        // Logic fix (a): 'guo' only combines with nationality 'ren'
-        return w.id === 'ren';
-      });
+      return WORDS.filter(w => w.id === 'ren');
     }
 
-    // Rule 7/Suffix/Noun/Thing selected
-    if (last.category === 'suffix' || last.category === 'noun' || last.category === 'thing') {
-      const isComposto = sequence.some(w => w.category === 'possessive');
-      const verbExists = sequence.some(w => w.category === 'verb');
-
-      // If noun was picked as part of a possessive before a verb (Rule 4)
-      if (!verbExists && isComposto) {
-        return WORDS.filter(w => ['adverb', 'verb'].includes(w.category));
+    // Case: Suffix, Noun, Thing, Adjective, Number
+    if (
+      last.category === 'suffix' || 
+      last.category === 'noun' || 
+      last.category === 'thing' || 
+      last.category === 'adjective' ||
+      last.category === 'number'
+    ) {
+      // Sub-rules for nested noun compound combinations
+      if (last.id === 'nan' || last.id === 'nü') {
+        return WORDS.filter(w => w.id === 'pengyou');
+      }
+      if (last.id === 'dianhua') {
+        return WORDS.filter(w => w.id === 'haoma' || w.id === 'da_call');
+      }
+      if (last.id === 'haoma') {
+        return WORDS.filter(w => w.id === 'duoshao' || w.category === 'number' || w.id === 'shi');
+      }
+      if (last.id === 'gongzuo') {
+        return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
       }
 
-      const hasQuestion = sequence.some(w => ['na', 'shenme'].includes(w.id));
-      // Only show 'ma' if it's not already a question with na/shenme
+      // If we are stating a phone number
+      if (last.category === 'number') {
+        return WORDS.filter(w => w.category === 'number' || w.id === 'ma');
+      }
+
+      // General endings
+      const isComposto = sequence.some(w => w.category === 'possessive');
+      if (!verbExists && isComposto && last.category !== 'adjective') {
+        return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
+      }
+
+      // Questions are final, but can have 'ma' if not a question already
       if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
         return WORDS.filter(w => w.id === 'ma');
       }
+
       return [];
     }
 
@@ -270,6 +434,10 @@ export default function App() {
       case 'plural': return 'bg-indigo-50';
       case 'possessive': return 'bg-rose-100';
       case 'thing': return 'bg-orange-50';
+      case 'adjective': return 'bg-yellow-50';
+      case 'number': return 'bg-teal-50';
+      case 'preposition': return 'bg-orange-100';
+      case 'etiquette': return 'bg-sky-100';
       default: return 'bg-white';
     }
   };
@@ -284,7 +452,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
-            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.6</p>
+            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.7</p>
           </div>
         </div>
         <button 
