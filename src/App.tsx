@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   User, Users, MessageSquare, UserCheck, Globe, 
   Flag, Type, HelpCircle, Search, Info, PlusSquare, 
@@ -157,10 +157,16 @@ const WORDS: Word[] = [
 export default function App() {
   const [sequence, setSequence] = useState<Word[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const addWord = (word: Word) => {
     setSequence([...sequence, word]);
     setSearchQuery(''); // Clear the search query after selecting a word
+    
+    // Focus search input on the next tick
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 0);
   };
   const removeLast = () => setSequence(sequence.slice(0, -1));
   const clearSequence = () => setSequence([]);
@@ -535,7 +541,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
-              <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.7</p>
+              <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">Sentencing Logic Engine v1.7.26</p>
             </div>
           </div>
           <button 
@@ -555,6 +561,7 @@ export default function App() {
           </div>
           <div className="relative">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Digite o pinyin, ideograma (hanzi) ou tradução em português..."
               value={searchQuery}
