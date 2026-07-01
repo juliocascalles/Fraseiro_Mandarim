@@ -9,31 +9,28 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Route for Gemini Translation
+  // API Route for Gemini Translation with MyMemory fallback
   app.post("/api/translate", async (req, res) => {
-    try {
-      const { text, wordsInfo } = req.body;
-      if (!text) {
-        return res.status(400).json({ error: "Nenhum texto fornecido" });
-      }
+    const { text, wordsInfo } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Nenhum texto fornecido" });
+    }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.error("GEMINI_API_KEY is not defined in process.env");
-        return res.status(500).json({ error: "Chave API do Gemini não configurada." });
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    // First, try Gemini if the key is available
+    if (apiKey) {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
           }
-        }
-      });
+        });
 
-      // Instruct Gemini to translate the generated Chinese sentence into accurate, natural Portuguese
-      const prompt = `Você é um tradutor especialista de Mandarim para Português Brasileiro.
+        const prompt = `Você é um tradutor especialista de Mandarim para Português Brasileiro.
 Traduza a seguinte frase em chinês (Mandarim) para o português de forma muito natural, precisa e fluida.
 
 Frase em Hanzi: ${text}
@@ -43,16 +40,49 @@ ${JSON.stringify(wordsInfo, null, 2)}
 
 Por favor, retorne APENAS a tradução direta em português (sem repetições, sem explicações, sem aspas e sem o texto original).`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-      });
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+        });
 
-      const translation = response.text?.trim() || "";
-      res.json({ translation });
-    } catch (error: any) {
-      console.error("Erro na tradução do Gemini:", error);
-      res.status(500).json({ error: error.message || "Falha ao traduzir frase" });
+        const translation = response.text?.trim();
+        if (translation) {
+          return res.json({ translation, provider: "gemini" });
+        }
+      } catch (geminiError: any) {
+        console.error("Erro na tradução com Gemini, tentando fallback MyMemory:", geminiError);
+      }
+    } else {
+      console.warn("GEMINI_API_KEY não configurada. Usando fallback de tradução MyMemory.");
+    }
+
+    // Fallback: Translate using the free MyMemory Translation API
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=zh-CN|pt-BR`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`MyMemory API error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const translation = data?.responseData?.translatedText;
+      
+      if (translation) {
+        // Clean up translation if it has HTML entities or remains unchanged
+        const decodedTranslation = translation
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&amp;/g, "&")
+          .trim();
+
+        return res.json({ translation: decodedTranslation, provider: "mymemory" });
+      }
+      throw new Error("Resposta de tradução vazia do MyMemory");
+    } catch (fallbackError: any) {
+      console.error("Erro no fallback de tradução MyMemory:", fallbackError);
+      return res.status(500).json({ 
+        error: "Não foi possível obter a tradução automática por nenhum serviço.", 
+        literalTranslation: wordsInfo.map((w: any) => w.translationLiteral).join(' ')
+      });
     }
   });
 

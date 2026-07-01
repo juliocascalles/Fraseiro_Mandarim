@@ -158,12 +158,14 @@ export default function App() {
   const [sequence, setSequence] = useState<Word[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [translation, setTranslation] = useState('');
+  const [translationProvider, setTranslationProvider] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState('');
 
   // Clear any existing translation when the sequence of words changes
   useEffect(() => {
     setTranslation('');
+    setTranslationProvider('');
     setTranslationError('');
     setIsTranslating(false);
   }, [sequence]);
@@ -174,6 +176,7 @@ export default function App() {
     setIsTranslating(true);
     setTranslationError('');
     setTranslation('');
+    setTranslationProvider('');
 
     const text = sequence.map(w => w.hanzi).join('');
     const wordsInfo = sequence.map(w => ({
@@ -199,6 +202,7 @@ export default function App() {
 
       const data = await response.json();
       setTranslation(data.translation);
+      setTranslationProvider(data.provider || 'mymemory');
     } catch (err: any) {
       console.error('Translation error:', err);
       setTranslationError('Não foi possível obter a tradução automática no momento.');
@@ -667,10 +671,10 @@ export default function App() {
               <button
                 onClick={handleTranslate}
                 disabled={isTranslating}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wider shadow-sm transition-all active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wider shadow-sm transition-all active:scale-95 cursor-pointer font-sans"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                {isTranslating ? 'Traduzindo...' : 'Traduzir com IA'}
+                {isTranslating ? 'Traduzindo...' : 'Traduzir Frase'}
               </button>
             </div>
 
@@ -681,34 +685,33 @@ export default function App() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
                   </span>
-                  Traduzindo frase com IA...
+                  Traduzindo frase...
                 </div>
               ) : translationError ? (
-                <div className="flex flex-col gap-1 w-full">
+                <div className="flex flex-col gap-1.5 w-full">
                   <p className="text-lg font-medium text-slate-700">
                     {sequence.map(w => w.translation).join(' ')}
                   </p>
                   <span className="text-[10px] text-amber-600 bg-amber-50 self-start px-2 py-0.5 rounded-full font-semibold border border-amber-100">
-                    Tradução Literal (Erro na API do Tradutor)
+                    Tradução Literal (Serviço de Tradução Indisponível)
                   </span>
                 </div>
               ) : translation ? (
-                <div className="flex flex-col gap-1 w-full">
-                  <p className="text-lg font-semibold text-indigo-900 transition-all duration-300">
+                <div className="flex flex-col gap-1.5 w-full">
+                  <p className="text-lg font-semibold text-indigo-950 transition-all duration-300">
                     {translation}
                   </p>
                   <span className="text-[10px] text-emerald-600 bg-emerald-50 self-start px-2 py-0.5 rounded-full font-semibold border border-emerald-100">
-                    Tradução por Inteligência Artificial
+                    {translationProvider === 'gemini' 
+                      ? 'Tradução por Inteligência Artificial (Gemini)' 
+                      : 'Tradução Automática (Google Translate / MyMemory)'}
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-1 w-full">
-                  <p className="text-lg font-medium text-slate-700 transition-all duration-300">
-                    {sequence.map(w => w.translation).join(' ')}
+                  <p className="text-sm text-slate-400 italic">
+                    Clique no botão acima para traduzir a frase.
                   </p>
-                  <span className="text-[10px] text-slate-500 bg-slate-100 self-start px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
-                    Tradução Literal (Aguardando Tradução com IA)
-                  </span>
                 </div>
               )}
             </div>
@@ -721,8 +724,8 @@ export default function App() {
                 </span>
               </div>
               
-              {/* Only show literal translation row if the AI translation is NOT available */}
-              {!translation && (
+              {/* Only show literal translation row if the translation API is NOT available */}
+              {translationError && (
                 <div>
                   <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block">Tradução Literal</span>
                   <span className="text-slate-600 font-medium">
