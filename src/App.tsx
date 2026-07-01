@@ -10,7 +10,7 @@ import {
   RefreshCcw, XCircle, Target, FileText, GraduationCap, 
   Briefcase, Tag, Trash2, ArrowRight, Book, Cat, Dog, 
   Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
-  Sparkles, X, CheckCircle2, RefreshCw
+  Sparkles, X, CheckCircle2, RefreshCw, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -157,59 +157,6 @@ const WORDS: Word[] = [
 export default function App() {
   const [sequence, setSequence] = useState<Word[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [translation, setTranslation] = useState('');
-  const [translationProvider, setTranslationProvider] = useState('');
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [translationError, setTranslationError] = useState('');
-
-  // Clear any existing translation when the sequence of words changes
-  useEffect(() => {
-    setTranslation('');
-    setTranslationProvider('');
-    setTranslationError('');
-    setIsTranslating(false);
-  }, [sequence]);
-
-  const handleTranslate = async () => {
-    if (sequence.length === 0) return;
-
-    setIsTranslating(true);
-    setTranslationError('');
-    setTranslation('');
-    setTranslationProvider('');
-
-    const text = sequence.map(w => w.hanzi).join('');
-    const wordsInfo = sequence.map(w => ({
-      id: w.id,
-      hanzi: w.hanzi,
-      pinyin: w.label,
-      translationLiteral: w.translation,
-      category: w.category
-    }));
-
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text, wordsInfo }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Falha na resposta do servidor');
-      }
-
-      const data = await response.json();
-      setTranslation(data.translation);
-      setTranslationProvider(data.provider || 'mymemory');
-    } catch (err: any) {
-      console.error('Translation error:', err);
-      setTranslationError('Não foi possível obter a tradução automática no momento.');
-    } finally {
-      setIsTranslating(false);
-    }
-  };
 
   const addWord = (word: Word) => {
     setSequence([...sequence, word]);
@@ -249,17 +196,6 @@ export default function App() {
 
     return false;
   };
-
-  // Filter words by search query for the palette
-  const filteredWords = useMemo(() => {
-    if (!searchQuery) return WORDS;
-    const q = searchQuery.toLowerCase().trim();
-    return WORDS.filter(w => 
-      w.label.toLowerCase().includes(q) || 
-      w.hanzi.includes(q) || 
-      w.translation.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
 
   // --- Rule Logic ---
   const availableWords = useMemo(() => {
@@ -551,6 +487,22 @@ export default function App() {
     return availableWords.some(w => w.id === word.id);
   };
 
+  // Filter words by search query and grammar availability for the palette
+  const filteredWords = useMemo(() => {
+    // Only show words that are currently available to select (grammatically allowed)
+    let words = WORDS.filter(w => availableWords.some(aw => aw.id === w.id));
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      words = words.filter(w => 
+        w.label.toLowerCase().includes(q) || 
+        w.hanzi.includes(q) || 
+        w.translation.toLowerCase().includes(q)
+      );
+    }
+    return words;
+  }, [searchQuery, availableWords]);
+
   // Get background color for categories
   const getCategoryBg = (category: string) => {
     switch (category) {
@@ -595,12 +547,75 @@ export default function App() {
           </button>
         </div>
 
+        {/* Prominent Search Bar Section */}
+        <div className="bg-slate-50 hover:bg-slate-100/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 border-2 border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2">
+            <Search className="w-5 h-5 text-indigo-600" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pesquisar Pinyins Disponíveis</span>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Digite o pinyin, ideograma (hanzi) ou tradução em português..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-4 pr-10 py-3 text-sm bg-white text-slate-800 rounded-xl border border-slate-200/80 focus:border-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Word Palette Board (Available words right below search bar) */}
+        {filteredWords.length > 0 && (
+          <div className="flex flex-col gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+            <div className="flex items-center gap-2 text-slate-600 font-semibold">
+              <PlusSquare className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1">
+              {filteredWords.map(word => {
+                const Icon = word.icon;
+                const clickable = isWordClickable(word);
+                return (
+                  <button
+                    key={word.id}
+                    onClick={() => clickable && addWord(word)}
+                    disabled={!clickable}
+                    className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
+                      clickable 
+                        ? `${getCategoryBg(word.category)} border-slate-200/80 text-slate-700 hover:scale-[102%] hover:shadow-md active:scale-95 cursor-pointer` 
+                        : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-xl ${clickable ? 'bg-white shadow-sm text-slate-600' : 'text-slate-300'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 font-bold leading-none">{word.label}</span>
+                      <span className="font-semibold text-sm truncate mt-0.5">{word.hanzi}</span>
+                      <span className="text-[10px] text-slate-400 truncate leading-none mt-0.5">{word.translation}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Active Sequence Board */}
         <div className="bg-slate-50 rounded-2xl p-5 md:p-6 border border-slate-100/80 min-h-[140px] flex flex-col justify-between relative overflow-hidden group">
           {sequence.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center text-slate-400">
               <Sparkles className="w-8 h-8 text-indigo-400/60 mb-2 animate-pulse" />
-              <p className="text-sm font-medium">Toque nas palavras abaixo para construir uma frase</p>
+              <p className="text-sm font-medium">Toque nas palavras acima para construir uma frase</p>
               <p className="text-xs text-slate-400/80 mt-1">A gramática mandarim será validada em tempo real</p>
             </div>
           ) : (
@@ -661,154 +676,54 @@ export default function App() {
 
         {/* Translation Panel */}
         {sequence.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100/60 flex flex-col gap-3 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100/60 flex flex-col gap-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-indigo-700">
                 <Globe className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Tradução</span>
+                <span className="text-xs font-bold uppercase tracking-wider font-sans">Tradução</span>
               </div>
               
-              <button
-                onClick={handleTranslate}
-                disabled={isTranslating}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wider shadow-sm transition-all active:scale-95 cursor-pointer font-sans"
+              <a
+                href={`https://translate.google.com/?sl=zh-CN&tl=pt&text=${encodeURIComponent(sequence.map(w => w.hanzi).join(''))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider shadow-sm transition-all active:scale-95 cursor-pointer font-sans"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                {isTranslating ? 'Traduzindo...' : 'Traduzir Frase'}
-              </button>
+                <ExternalLink className="w-3.5 h-3.5" />
+                Abrir no Google Tradutor
+              </a>
             </div>
 
-            <div className="min-h-[2rem] flex items-center">
-              {isTranslating ? (
-                <div className="flex items-center gap-1.5 text-xs text-indigo-500 font-semibold uppercase tracking-wider animate-pulse">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
-                  </span>
-                  Traduzindo frase...
-                </div>
-              ) : translationError ? (
-                <div className="flex flex-col gap-1.5 w-full">
-                  <p className="text-lg font-medium text-slate-700">
-                    {sequence.map(w => w.translation).join(' ')}
-                  </p>
-                  <span className="text-[10px] text-amber-600 bg-amber-50 self-start px-2 py-0.5 rounded-full font-semibold border border-amber-100">
-                    Tradução Literal (Serviço de Tradução Indisponível)
-                  </span>
-                </div>
-              ) : translation ? (
-                <div className="flex flex-col gap-1.5 w-full">
-                  <p className="text-lg font-semibold text-indigo-950 transition-all duration-300">
-                    {translation}
-                  </p>
-                  <span className="text-[10px] text-emerald-600 bg-emerald-50 self-start px-2 py-0.5 rounded-full font-semibold border border-emerald-100">
-                    {translationProvider === 'gemini' 
-                      ? 'Tradução por Inteligência Artificial (Gemini)' 
-                      : 'Tradução Automática (Google Translate / MyMemory)'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1 w-full">
-                  <p className="text-sm text-slate-400 italic">
-                    Clique no botão acima para traduzir a frase.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-indigo-100/50 pt-2.5 mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div className="bg-white/80 rounded-xl p-4 border border-indigo-100/40 flex flex-col gap-3">
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block">Pinyin</span>
-                <span className="font-mono text-[11px] text-indigo-600 font-semibold">
-                  {sequence.map(w => w.label).join(' ')}
+                <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Frase Gerada (Mandarim)</span>
+                <span className="text-xl font-semibold text-slate-800 leading-normal">
+                  {sequence.map(w => w.hanzi).join('')}
                 </span>
               </div>
-              
-              {/* Only show literal translation row if the translation API is NOT available */}
-              {translationError && (
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                 <div>
-                  <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block">Tradução Literal</span>
-                  <span className="text-slate-600 font-medium">
+                  <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Pronúncia (Pinyin)</span>
+                  <span className="font-mono text-xs text-indigo-600 font-semibold bg-indigo-50/50 px-2 py-1 rounded-lg inline-block">
+                    {sequence.map(w => w.label).join(' ')}
+                  </span>
+                </div>
+                
+                <div>
+                  <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Tradução Literal</span>
+                  <span className="text-xs text-slate-600 font-medium italic">
                     {sequence.map(w => w.translation).join(' ')}
                   </span>
                 </div>
-              )}
+              </div>
             </div>
+
+            <p className="text-[10px] text-slate-400 font-medium italic">
+              * Clique no botão acima para abrir o Google Tradutor em outra aba e visualizar a tradução contextualizada e fluida.
+            </p>
           </div>
         )}
-
-        {/* Prominent Search Bar Section */}
-        <div className="bg-slate-50 hover:bg-slate-100/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 border-2 border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-300">
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-indigo-600" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pesquisar Pinyins Disponíveis</span>
-          </div>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Digite o pinyin, ideograma (hanzi) ou tradução em português..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-4 pr-10 py-3 text-sm bg-white text-slate-800 rounded-xl border border-slate-200/80 focus:border-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium shadow-inner"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Word Palette Board */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-slate-500 font-medium">
-            <PlusSquare className="w-4 h-4 text-indigo-500" />
-            <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
-          </div>
-
-          {filteredWords.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-              <p className="text-xs font-medium">Nenhuma palavra encontrada para "{searchQuery}"</p>
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-1.5 underline cursor-pointer"
-              >
-                Limpar pesquisa
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1">
-              {filteredWords.map(word => {
-                const Icon = word.icon;
-                const clickable = isWordClickable(word);
-                return (
-                  <button
-                    key={word.id}
-                    onClick={() => clickable && addWord(word)}
-                    disabled={!clickable}
-                    className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
-                      clickable 
-                        ? `${getCategoryBg(word.category)} border-slate-200/80 text-slate-700 hover:scale-[102%] hover:shadow-md active:scale-95 cursor-pointer` 
-                        : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-xl ${clickable ? 'bg-white shadow-sm text-slate-600' : 'text-slate-300'}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 font-bold leading-none">{word.label}</span>
-                      <span className="font-semibold text-sm truncate mt-0.5">{word.hanzi}</span>
-                      <span className="text-[10px] text-slate-400 truncate leading-none mt-0.5">{word.translation}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* Grammar Help Panel */}
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 text-xs text-slate-500 flex flex-col gap-1.5">
