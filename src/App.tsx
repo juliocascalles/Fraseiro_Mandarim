@@ -12,7 +12,7 @@ import {
   Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
-  ListOrdered, PauseCircle
+  ListOrdered, PauseCircle, Award, BookOpen, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -69,6 +69,7 @@ const WORDS: Word[] = [
   { id: 'mei', label: 'méi', hanzi: '没', translation: 'não (ter/passado)', category: 'adverb', icon: XCircle },
   { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target },
   { id: 'hen', label: 'hen', hanzi: '很', translation: 'muito', category: 'adverb', icon: PlusSquare },
+  { id: 'yidian', label: 'yìdiǎn', hanzi: '一点', translation: 'um pouco', category: 'adverb', icon: Sparkles },
   
   // Prepositions
   { id: 'gei', label: 'gei', hanzi: '给', translation: 'para', category: 'preposition', icon: Tag },
@@ -76,14 +77,15 @@ const WORDS: Word[] = [
   // Conjunctions
   { id: 'he_conj', label: 'he', hanzi: '和', translation: 'e', category: 'conjunction', icon: PlusSquare },
 
-  // Verbs
+  // Verbs & Auxiliary/Modal Verbs
   { id: 'shi', label: 'shi', hanzi: '是', translation: 'ser', category: 'verb', icon: UserCheck },
   { id: 'you_verb', label: 'you', hanzi: '有', translation: 'ter/haver', category: 'verb', icon: PlusSquare },
   { id: 'shuo', label: 'shuo', hanzi: '说', translation: 'falar', category: 'verb', icon: MessageSquare },
   { id: 'jiao', label: 'jiao', hanzi: '叫', translation: 'chamar-se', category: 'verb', icon: Tag },
   { id: 'xihuan', label: 'xihuan', hanzi: '喜欢', translation: 'gostar', category: 'verb', icon: Target },
   { id: 'zai', label: 'zai', hanzi: '在', translation: 'estar/em', category: 'verb', icon: Target },
-  { id: 'keyi', label: 'ke yi', hanzi: '可以', translation: 'poder', category: 'verb', icon: UserCheck },
+  { id: 'keyi', label: 'ke yi', hanzi: '可以', translation: 'poder (permissão)', category: 'verb', icon: UserCheck },
+  { id: 'hui', label: 'huì', hanzi: '会', translation: 'poder/saber (habilidade adquirida)', category: 'verb', icon: Award },
   { id: 'da_call', label: 'da', hanzi: '打', translation: 'ligar', category: 'verb', icon: MessageSquare },
   { id: 'fa_verb', label: 'fa', hanzi: '发', translation: 'enviar', category: 'verb', icon: PlusSquare },
   { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber/conhecer', category: 'verb', icon: FileText },
@@ -111,7 +113,7 @@ const WORDS: Word[] = [
   { id: 'ji', label: 'ji', hanzi: '几', translation: 'quantos?', category: 'question', icon: HelpCircle },
   { id: 'na', label: 'na', hanzi: '哪', translation: 'qual', category: 'question', icon: Search },
   { id: 'shenme', label: 'shenme', hanzi: '什么', translation: 'o quê', category: 'question', icon: Info },
-  { id: 'duoshao', label: 'duoshao', hanzi: 'duo shao', translation: 'quanto?', category: 'question', icon: HelpCircle },
+  { id: 'duoshao', label: 'duōshao', hanzi: '多少', translation: 'quanto?', category: 'question', icon: HelpCircle },
   { id: 'nali', label: 'nali', hanzi: '哪里', translation: 'onde?', category: 'question', icon: Search },
   { id: 'zenmeyang', label: 'zenmeyang', hanzi: '怎么样', translation: 'como é...?', category: 'question', icon: HelpCircle },
   { id: 'shei', label: 'shéi', hanzi: '谁', translation: 'quem', category: 'question', icon: HelpCircle },
@@ -129,6 +131,7 @@ const WORDS: Word[] = [
   { id: 'ren', label: 'ren', hanzi: '人', translation: 'pessoa', category: 'suffix', icon: Users },
 
   // Nouns
+  { id: 'hanyu', label: 'Hanyu', hanzi: '汉语', translation: 'mandarim (língua)', category: 'noun', icon: BookOpen },
   { id: 'mingzi', label: 'ming zi', hanzi: '名字', translation: 'nome', category: 'noun', icon: FileText },
   { id: 'tongxue', label: 'tongxue', hanzi: '同学', translation: 'colega', category: 'noun', icon: GraduationCap },
   { id: 'laoshi', label: 'laoshi', hanzi: '老师', translation: 'professor', category: 'noun', icon: Briefcase },
@@ -154,6 +157,7 @@ const WORDS: Word[] = [
   { id: 'mifan', label: 'mifan', hanzi: '米饭', translation: 'arroz', category: 'thing', icon: Utensils },
   { id: 'mianbao', label: 'mianbao', hanzi: '面包', translation: 'pão', category: 'thing', icon: Milk },
   { id: 'tang', label: 'tang', hanzi: '汤', translation: 'sopa', category: 'thing', icon: Soup },
+  { id: 'qian', label: 'qián', hanzi: '钱', translation: 'dinheiro (preço)', category: 'thing', icon: Coins },
 
   // Adjectives
   { id: 'da_adj', label: 'dà', hanzi: '大', translation: 'grande', category: 'adjective', icon: Tag },
@@ -187,6 +191,15 @@ const WORDS: Word[] = [
 // Map of multi-word / compound pinyins to dictionary ID
 const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'mei': 'mei',
+  'hui': 'hui',
+  'yi dian': 'yidian',
+  'yidian': 'yidian',
+  'yi dianr': 'yidian',
+  'yidianr': 'yidian',
+  'yi dian dian': 'yidian',
+  'yidiandian': 'yidian',
+  'han yu': 'hanyu',
+  'hanyu': 'hanyu',
   'xie xie': 'xie_xie',
   'xiexie': 'xie_xie',
   'ke yi': 'keyi',
@@ -292,12 +305,18 @@ function checkIsValid(seq: Word[]): boolean {
     return true;
   }
 
-  // If it's a verb, but NOT transitive verbs requiring objects (unless negated in short dialogue)
+  // If ending in yidian (e.g. wo hui shuo yidian, wo zhidao yidian)
+  if (last.id === 'yidian') {
+    return verbExists;
+  }
+
+  // If it's a verb, but NOT transitive verbs requiring objects (unless negated or preceded by auxiliary verbs keyi/hui/qing in short dialogue)
   if (last.category === 'verb') {
     const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
+    const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing'].includes(w.id));
     if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
-    if (isNegated && ['shuo', 'he', 'xihuan'].includes(last.id)) return true; // 'wo bu shuo', 'wo mei shuo', 'wo bu he'
-    if (['shi', 'jiao', 'zai', 'keyi', 'da_call', 'fa_verb', 'you_verb'].includes(last.id)) {
+    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'xihuan'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'wo bu shuo', 'wo mei shuo', 'qing shuo'
+    if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb'].includes(last.id)) {
       return false;
     }
     return true;
@@ -314,12 +333,15 @@ function checkIsValid(seq: Word[]): boolean {
 function getAvailableWordsForSequence(sequence: Word[]): Word[] {
   const getBaseWords = (): Word[] => {
     if (sequence.length === 0) {
-      // Can start with pronoun, etiquette, shei, family members, or jia
+      // Can start with pronoun, etiquette, shei, duoshao, family members, things, or nouns
       return WORDS.filter(w => 
         w.category === 'pronoun' || 
         w.category === 'etiquette' || 
         w.category === 'family' ||
-        w.id === 'shei'
+        w.id === 'shei' ||
+        w.id === 'duoshao' ||
+        w.category === 'thing' ||
+        w.category === 'noun'
       );
     }
 
@@ -339,7 +361,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     // Case: Etiquette selected
     if (last.category === 'etiquette') {
       if (last.id === 'qing') {
-        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
+        return WORDS.filter(w => ['zuo', 'he', 'jin', 'shuo', 'keyi'].includes(w.id));
       }
       if (last.id === 'xie_xie') {
         return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family');
@@ -402,7 +424,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
           if (w.category === 'preposition') return true; // ex: wo gei ...
           if (['zhe', 'na_dem'].includes(last.id)) {
-            if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun') return true;
+            if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun' || w.id === 'duoshao') return true;
           }
           return false;
         });
@@ -463,8 +485,19 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       return WORDS.filter(w => ['noun', 'country', 'thing', 'family', 'adjective'].includes(w.category));
     }
 
-    // Case: Adverb selected (hen, bu, mei, dou, ye, zhi)
+    // Case: Adverb selected (hen, bu, mei, dou, ye, zhi, yidian)
     if (last.category === 'adverb') {
+      if (last.id === 'yidian') {
+        // 'yidian' (一点 - um pouco): followed by nouns (hanyu, etc.), things (shui, cha, etc.), adjectives (mang, lei, etc.) or question particle ma
+        return WORDS.filter(w => {
+          if (w.id === 'hanyu') return true;
+          if (['thing', 'noun', 'adjective'].includes(w.category)) {
+            return !['nan', 'nü', 'haoma', 'dianhua'].includes(w.id);
+          }
+          if (w.id === 'ma') return true;
+          return false;
+        });
+      }
       if (last.id === 'hen') {
         return WORDS.filter(w => w.category === 'adjective');
       }
@@ -483,8 +516,9 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     // Case: Verb selected
     if (last.category === 'verb') {
       if (last.id === 'you_verb') {
-        // you can take numbers, question particles (ji, shenme, duoshao), classifiers, family members, things, nouns
+        // you can take numbers, question particles (ji, shenme, duoshao), classifiers, family members, things, nouns, or yidian (e.g. you yidian mang)
         return WORDS.filter(w => {
+          if (w.id === 'yidian') return true;
           if (['number', 'classifier', 'family', 'thing', 'noun'].includes(w.category)) return true;
           if (['ji', 'shenme', 'duoshao', 'shei'].includes(w.id)) return true;
           if (w.category === 'pronoun' && !['zhe', 'na_dem'].includes(w.id)) return true;
@@ -504,11 +538,12 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
       if (last.id === 'shuo') {
         return WORDS.filter(w => {
-          if (w.id === 'na' || w.id === 'shenme') return true;
+          if (w.id === 'hanyu' || w.id === 'yidian' || w.id === 'na' || w.id === 'shenme') return true;
           if (w.category === 'country') {
             return !['baxi', 'jianada'].includes(w.id);
           }
           if (w.category === 'pronoun') return true;
+          if (w.id === 'ma') return true;
           return false;
         });
       }
@@ -522,7 +557,13 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'keyi') {
-        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id) || w.id === 'gei');
+        // 'keyi' (可以 - poder / permissão): seguido de ações (shuo, zuo, he, jin, da_call, fa_verb) ou preposição gei
+        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'jin', 'da_call', 'fa_verb'].includes(w.id) || w.id === 'gei');
+      }
+
+      if (last.id === 'hui') {
+        // 'hui' (会 - poder / saber como habilidade adquirida): seguido de ações (shuo, zuo, he, da_call, fa_verb, jin)
+        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'da_call', 'fa_verb', 'jin'].includes(w.id));
       }
 
       if (last.id === 'da_call') {
@@ -534,11 +575,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'zhidao') {
-        return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question', 'family'].includes(w.category));
+        return WORDS.filter(w => w.id === 'yidian' || ['noun', 'thing', 'pronoun', 'question', 'family'].includes(w.category));
       }
 
       if (last.id === 'he') {
-        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
+        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang', 'yidian'].includes(w.id));
       }
 
       // Default verb output (e.g. 'shi'): can follow with nouns, countries, pronouns, family, questions, things, numbers
@@ -551,6 +592,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
     // Case: Question particles
     if (last.category === 'question') {
+      if (last.id === 'duoshao') {
+        // 'duoshao' (多少 - quanto): followed by 'qian' (dinheiro / preço), 'ren', 'ge_class', 'kou', 'xuesheng', 'laoshi', things, nouns
+        return WORDS.filter(w => ['qian', 'ren', 'ge_class', 'kou', 'xuesheng', 'laoshi', 'tongxue'].includes(w.id) || ['thing', 'noun'].includes(w.category));
+      }
+
       if (last.id === 'ji') {
         // 'ji' is question particle for quantity (family/things < 10)
         // Followed by: classifier (kou, ge_class), family members directly, things, or nouns (ren, etc.)
@@ -583,8 +629,9 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => w.id === 'ren' || (w.category === 'family' && w.id !== 'jia'));
       }
       if (last.id === 'ge_class') {
-        // ge -> family members, nouns, things, suffix ren
+        // ge -> family members, nouns, things, suffix ren, question (duoshao, zenmeyang)
         return WORDS.filter(w => {
+          if (w.id === 'duoshao' || w.id === 'zenmeyang') return true;
           if (w.category === 'family' && w.id !== 'jia') return true;
           if (['noun', 'thing'].includes(w.category)) {
             return !['nan', 'nü', 'haoma', 'dianhua'].includes(w.id);
@@ -660,9 +707,8 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       // General endings
-      const isComposto = sequence.some(w => w.category === 'possessive');
-      if (!verbExists && isComposto && last.category !== 'adjective') {
-        return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
+      if (!verbExists && !hasQuestion && last.category !== 'adjective') {
+        return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question', 'possessive'].includes(w.category));
       }
 
       // Questions are final, but can have 'ma' if not a question already
@@ -1098,7 +1144,7 @@ function tokenizePhraseInput(input: string): string[] {
   while (i < rawWords.length) {
     const norm = normalizePinyinText(rawWords[i]);
 
-    // Handle compound negatives written without spaces (meiyou -> mei + you, buyou -> bu + you)
+    // Handle compound negatives written without spaces (meiyou -> mei + you, buyou -> bu + you, buhui -> bu + hui, bukeyi -> bu + keyi)
     if (norm === 'meiyou') {
       tokens.push('mei', 'you');
       i++;
@@ -1106,6 +1152,31 @@ function tokenizePhraseInput(input: string): string[] {
     }
     if (norm === 'buyou') {
       tokens.push('bu', 'you');
+      i++;
+      continue;
+    }
+    if (norm === 'buhui') {
+      tokens.push('bu', 'hui');
+      i++;
+      continue;
+    }
+    if (norm === 'bukeyi') {
+      tokens.push('bu', 'keyi');
+      i++;
+      continue;
+    }
+    if (norm === 'zhege') {
+      tokens.push('zhe', 'ge');
+      i++;
+      continue;
+    }
+    if (norm === 'nage') {
+      tokens.push('na', 'ge');
+      i++;
+      continue;
+    }
+    if (norm === 'duoshaoqian') {
+      tokens.push('duo shao', 'qian');
       i++;
       continue;
     }
@@ -1990,6 +2061,9 @@ export default function App() {
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 text-xs text-slate-500 flex flex-col gap-1.5">
           <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Dicas Rápidas de Gramática:</span>
           <ul className="list-disc pl-4 space-y-1">
+            <li><strong className="text-indigo-600">Perguntar Preço ("duo shao qian"):</strong> Use <strong className="text-indigo-600">duōshao qián (多少钱)</strong> para perguntar o valor ou preço de itens ou demonstrativos (ex: <strong className="font-mono text-[11px] text-indigo-700">zhe ge duo shao qian?</strong> = quanto custa isto?, <strong className="font-mono text-[11px] text-indigo-700">kafei duo shao qian?</strong> = quanto custa o café?, <strong className="font-mono text-[11px] text-indigo-700">duo shao qian?</strong> = quanto custa?).</li>
+            <li><strong className="text-indigo-600">Expressão "Um Pouco" ("yidian"):</strong> Use <strong className="text-indigo-600">yìdiǎn (一点)</strong> para expressar pequenas quantidades após verbos de ação ou antes de substantivos e adjetivos (ex: <strong className="font-mono text-[11px] text-indigo-700">wo hui shuo yidian Hanyu</strong> = eu falo um pouco de mandarim, <strong className="font-mono text-[11px] text-indigo-700">he yidian shui</strong> = beber um pouco d'água, <strong className="font-mono text-[11px] text-indigo-700">wo you yidian mang</strong> = estou um pouco ocupado).</li>
+            <li><strong className="text-indigo-600">Poder/Capacidade ("keyi" vs "hui"):</strong> Use <strong className="text-indigo-600">keyi (可以)</strong> para <em>permissão, autorização ou possibilidade</em> (ex: <strong className="font-mono text-[11px] text-indigo-700">ni keyi shuo</strong> = você pode falar / tem permissão, <strong className="font-mono text-[11px] text-indigo-700">wo keyi jin ma?</strong> = posso entrar?). Use <strong className="text-indigo-600">hui (会)</strong> para <em>capacidade adquirida ou habilidade aprendida</em> através de estudo/treino (ex: <strong className="font-mono text-[11px] text-indigo-700">wo hui shuo Hanyu</strong> = eu sei/posso falar mandarim, <strong className="font-mono text-[11px] text-indigo-700">ni hui shuo Hanyu ma?</strong> = você sabe falar mandarim?).</li>
             <li><strong className="text-indigo-600">Negação ("bu" vs "mei"):</strong> Use <strong className="text-indigo-600">bu (不)</strong> para presente/futuro e com o verbo <em>shi</em> (<strong className="font-mono text-[11px] text-indigo-700">bu shi</strong>). Para o verbo <strong className="text-indigo-600">you (有 - ter/haver)</strong> e ações no passado, use sempre <strong className="text-indigo-600">mei (没)</strong> (ex: <strong className="font-mono text-[11px] text-indigo-700">wo mei you gongzuo</strong> = eu não tenho emprego, <strong className="font-mono text-[11px] text-indigo-700">wo mei shuo</strong> = eu não falei).</li>
             <li><strong className="text-indigo-600">Família & Posse:</strong> Membros da família e <strong className="text-indigo-600">jia (家 - casa/família)</strong> dispensam o possessivo <em>de</em> (ex: <strong className="font-mono text-[11px] text-indigo-700">wo jia</strong> = minha família/casa, <strong className="font-mono text-[11px] text-indigo-700">wo baba</strong> = meu pai).</li>
             <li><strong className="text-indigo-600">Membros da Família:</strong> Usa-se o classificador figurativo <strong className="text-indigo-600">kou (口 - bocas/membros)</strong> para contar pessoas na família (ex: <strong className="font-mono text-[11px] text-indigo-700">wo jia you si kou ren</strong> = minha família tem 4 pessoas).</li>
