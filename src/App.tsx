@@ -65,7 +65,8 @@ const WORDS: Word[] = [
   // Adverbs
   { id: 'dou', label: 'dou', hanzi: '都', translation: 'todos', category: 'adverb', icon: PlusSquare },
   { id: 'ye', label: 'yê', hanzi: '也', translation: 'também', category: 'adverb', icon: RefreshCcw },
-  { id: 'bu', label: 'bù', hanzi: '不', translation: 'não', category: 'adverb', icon: XCircle },
+  { id: 'bu', label: 'bù', hanzi: '不', translation: 'não (presente/futuro)', category: 'adverb', icon: XCircle },
+  { id: 'mei', label: 'méi', hanzi: '没', translation: 'não (ter/passado)', category: 'adverb', icon: XCircle },
   { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target },
   { id: 'hen', label: 'hen', hanzi: '很', translation: 'muito', category: 'adverb', icon: PlusSquare },
   
@@ -185,6 +186,7 @@ const WORDS: Word[] = [
 
 // Map of multi-word / compound pinyins to dictionary ID
 const COMPOUND_PINYIN_MAP: Record<string, string> = {
+  'mei': 'mei',
   'xie xie': 'xie_xie',
   'xiexie': 'xie_xie',
   'ke yi': 'keyi',
@@ -277,9 +279,9 @@ function checkIsValid(seq: Word[]): boolean {
     // If last is 'ren' (e.g. 'wo jia you si kou ren', 'ni jia you ji kou ren', 'wo shi baxi ren')
     if (last.id === 'ren') return true;
 
-    // If last is family member or thing or noun, valid if there is a verb or adjective or question
+    // If last is family member or thing or noun, valid if there is a verb or adjective or question or negative mei
     if (['family', 'thing', 'noun'].includes(last.category)) {
-      if (verbExists || seq.some(w => w.category === 'adjective') || hasQuestion) {
+      if (verbExists || seq.some(w => w.category === 'adjective' || w.id === 'mei') || hasQuestion) {
         return true;
       }
       return false;
@@ -290,9 +292,12 @@ function checkIsValid(seq: Word[]): boolean {
     return true;
   }
 
-  // If it's a verb, but NOT transitive verbs requiring objects
+  // If it's a verb, but NOT transitive verbs requiring objects (unless negated in short dialogue)
   if (last.category === 'verb') {
-    if (['shi', 'shuo', 'jiao', 'xihuan', 'zai', 'keyi', 'da_call', 'fa_verb', 'zhidao', 'he', 'you_verb'].includes(last.id)) {
+    const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
+    if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
+    if (isNegated && ['shuo', 'he', 'xihuan'].includes(last.id)) return true; // 'wo bu shuo', 'wo mei shuo', 'wo bu he'
+    if (['shi', 'jiao', 'zai', 'keyi', 'da_call', 'fa_verb', 'you_verb'].includes(last.id)) {
       return false;
     }
     return true;
@@ -458,15 +463,21 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       return WORDS.filter(w => ['noun', 'country', 'thing', 'family', 'adjective'].includes(w.category));
     }
 
-    // Case: Adverb selected (hen, bu, dou, ye, zhi)
+    // Case: Adverb selected (hen, bu, mei, dou, ye, zhi)
     if (last.category === 'adverb') {
       if (last.id === 'hen') {
         return WORDS.filter(w => w.category === 'adjective');
       }
       if (last.id === 'bu') {
-        return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
+        // In Mandarin, 'bu' cannot negate 'you' (ter/haver) -> must use 'mei' (没)
+        return WORDS.filter(w => (w.category === 'verb' && w.id !== 'you_verb') || w.category === 'adjective');
       }
-      return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
+      if (last.id === 'mei') {
+        // 'mei' (没) negates 'you' (ter/haver) and past actions, or directly precedes nouns/things in colloquial speech (e.g. wo mei gongzuo)
+        // Note: 'shi' is negated with 'bu shi' (不是), not 'mei shi'
+        return WORDS.filter(w => (w.category === 'verb' && w.id !== 'shi') || ['noun', 'thing', 'family'].includes(w.category));
+      }
+      return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu', 'mei'].includes(w.id));
     }
 
     // Case: Verb selected
@@ -936,7 +947,7 @@ function getDidYouMeanSuggestion(input: string, currentActiveSequence: Word[] = 
     return null;
   }
 
-  // Case 2: Multi-word phrase query (e.g. "wo jia you si ko ren")
+  // Case 2: Multi-word phrase query (e.g. "wo jia you si ko ren", "wo bu you gongzuo")
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     const exactMatches = findCandidatesForToken(token);
@@ -944,7 +955,57 @@ function getDidYouMeanSuggestion(input: string, currentActiveSequence: Word[] = 
     if (exactMatches.length > 0) {
       // Valid word found
       const allowed = getAvailableWordsForSequence(trackedSeq);
-      const validMatch = exactMatches.find(c => allowed.some(a => a.id === c.id)) || exactMatches[0];
+      let validMatch = exactMatches.find(c => allowed.some(a => a.id === c.id));
+
+      // Special Grammar Auto-Correction: "bu you" -> "mei you" (negating 'you' with 'mei')
+      if (
+        !validMatch &&
+        exactMatches.some(c => c.id === 'you_verb') &&
+        trackedSeq.length > 0 &&
+        trackedSeq[trackedSeq.length - 1].id === 'bu'
+      ) {
+        const meiWord = WORDS.find(w => w.id === 'mei')!;
+        trackedSeq[trackedSeq.length - 1] = meiWord;
+
+        if (parts.length > 0) {
+          parts[parts.length - 1] = {
+            text: 'MEI',
+            isChanged: true,
+            word: meiWord,
+          };
+          suggestedTokens[suggestedTokens.length - 1] = 'mei';
+        }
+        hasCorrections = true;
+
+        const updatedAllowed = getAvailableWordsForSequence(trackedSeq);
+        validMatch = exactMatches.find(c => updatedAllowed.some(a => a.id === c.id)) || exactMatches[0];
+      } else if (
+        !validMatch &&
+        exactMatches.some(c => c.id === 'shi') &&
+        trackedSeq.length > 0 &&
+        trackedSeq[trackedSeq.length - 1].id === 'mei'
+      ) {
+        // "mei shi" -> "bu shi"
+        const buWord = WORDS.find(w => w.id === 'bu')!;
+        trackedSeq[trackedSeq.length - 1] = buWord;
+
+        if (parts.length > 0) {
+          parts[parts.length - 1] = {
+            text: 'BU',
+            isChanged: true,
+            word: buWord,
+          };
+          suggestedTokens[suggestedTokens.length - 1] = 'bu';
+        }
+        hasCorrections = true;
+
+        const updatedAllowed = getAvailableWordsForSequence(trackedSeq);
+        validMatch = exactMatches.find(c => updatedAllowed.some(a => a.id === c.id)) || exactMatches[0];
+      }
+
+      if (!validMatch) {
+        validMatch = exactMatches[0];
+      }
 
       trackedSeq.push(validMatch);
       suggestedWords.push(validMatch);
@@ -1035,6 +1096,20 @@ function tokenizePhraseInput(input: string): string[] {
   const tokens: string[] = [];
   let i = 0;
   while (i < rawWords.length) {
+    const norm = normalizePinyinText(rawWords[i]);
+
+    // Handle compound negatives written without spaces (meiyou -> mei + you, buyou -> bu + you)
+    if (norm === 'meiyou') {
+      tokens.push('mei', 'you');
+      i++;
+      continue;
+    }
+    if (norm === 'buyou') {
+      tokens.push('bu', 'you');
+      i++;
+      continue;
+    }
+
     // Try 3-word window
     if (i + 2 < rawWords.length) {
       const triKey = `${normalizePinyinText(rawWords[i])} ${normalizePinyinText(rawWords[i + 1])} ${normalizePinyinText(rawWords[i + 2])}`;
@@ -1168,7 +1243,13 @@ function validateAndBuildPhrase(input: string): PhraseValidationReport {
         explanation = `A frase não pode começar com a palavra "${candidate.label}" (${candidate.hanzi} - ${candidate.translation}). No mandarim, inicie com o sujeito (pronome, membro da família ou expressão de cortesia).`;
       } else {
         const prevWord = currentSeq[currentSeq.length - 1];
-        explanation = `Após "${prevWord.label}" (${prevWord.hanzi} - ${prevWord.translation}), a palavra "${candidate.label}" (${candidate.hanzi} - ${candidate.translation}) não é permitida pela ordem gramatical.`;
+        if (prevWord.id === 'bu' && candidates.some(c => c.id === 'you_verb')) {
+          explanation = `O verbo "you" (有 - ter/haver) e ações no passado não aceitam a negação com "bu" (不). Em vez de "bu", use "mei" (没). Exemplo: "wo mei you gongzuo" (Eu não tenho trabalho/emprego).`;
+        } else if (prevWord.id === 'mei' && candidates.some(c => c.id === 'shi')) {
+          explanation = `O verbo "shi" (是 - ser) deve ser negado com "bu" (不是 - não ser), enquanto "mei" (没) é reservado para "you" (没有) e ações no passado.`;
+        } else {
+          explanation = `Após "${prevWord.label}" (${prevWord.hanzi} - ${prevWord.translation}), a palavra "${candidate.label}" (${candidate.hanzi} - ${candidate.translation}) não é permitida pela ordem gramatical.`;
+        }
       }
 
       steps.push({
@@ -1190,6 +1271,8 @@ function validateAndBuildPhrase(input: string): PhraseValidationReport {
         });
       }
 
+      const suggestion = getDidYouMeanSuggestion(input, []);
+
       return {
         rawInput: input,
         steps,
@@ -1198,7 +1281,7 @@ function validateAndBuildPhrase(input: string): PhraseValidationReport {
         errorReason: 'A palavra existe, mas não pode ser inserida porque não está na ordem correta para formar uma frase.',
         validWords: currentSeq,
         isCompleteSentence: checkIsValid(currentSeq),
-        suggestion: null,
+        suggestion,
       };
     }
   }
@@ -1308,10 +1391,12 @@ export default function App() {
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase().trim();
+      const normQ = normalizePinyinText(searchQuery);
       words = words.filter(w => 
-        w.label.toLowerCase().includes(q) || 
+        normalizePinyinText(w.label).includes(normQ) || 
+        normalizePinyinText(w.id).includes(normQ) ||
         w.hanzi.includes(q) || 
-        w.translation.toLowerCase().includes(q)
+        normalizePinyinText(w.translation).includes(normQ)
       );
     }
     return words;
@@ -1321,10 +1406,12 @@ export default function App() {
   const matchingDictionaryWords = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
+    const normQ = normalizePinyinText(searchQuery);
     return WORDS.filter(w => 
-      w.label.toLowerCase().includes(q) || 
+      normalizePinyinText(w.label).includes(normQ) || 
+      normalizePinyinText(w.id).includes(normQ) ||
       w.hanzi.includes(q) || 
-      w.translation.toLowerCase().includes(q)
+      normalizePinyinText(w.translation).includes(normQ)
     );
   }, [searchQuery]);
 
@@ -1903,6 +1990,7 @@ export default function App() {
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 text-xs text-slate-500 flex flex-col gap-1.5">
           <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Dicas Rápidas de Gramática:</span>
           <ul className="list-disc pl-4 space-y-1">
+            <li><strong className="text-indigo-600">Negação ("bu" vs "mei"):</strong> Use <strong className="text-indigo-600">bu (不)</strong> para presente/futuro e com o verbo <em>shi</em> (<strong className="font-mono text-[11px] text-indigo-700">bu shi</strong>). Para o verbo <strong className="text-indigo-600">you (有 - ter/haver)</strong> e ações no passado, use sempre <strong className="text-indigo-600">mei (没)</strong> (ex: <strong className="font-mono text-[11px] text-indigo-700">wo mei you gongzuo</strong> = eu não tenho emprego, <strong className="font-mono text-[11px] text-indigo-700">wo mei shuo</strong> = eu não falei).</li>
             <li><strong className="text-indigo-600">Família & Posse:</strong> Membros da família e <strong className="text-indigo-600">jia (家 - casa/família)</strong> dispensam o possessivo <em>de</em> (ex: <strong className="font-mono text-[11px] text-indigo-700">wo jia</strong> = minha família/casa, <strong className="font-mono text-[11px] text-indigo-700">wo baba</strong> = meu pai).</li>
             <li><strong className="text-indigo-600">Membros da Família:</strong> Usa-se o classificador figurativo <strong className="text-indigo-600">kou (口 - bocas/membros)</strong> para contar pessoas na família (ex: <strong className="font-mono text-[11px] text-indigo-700">wo jia you si kou ren</strong> = minha família tem 4 pessoas).</li>
             <li><strong className="text-indigo-600">Perguntas de Quantidade:</strong> Use <strong className="text-indigo-600">ji (几)</strong> para perguntar quantidades (ex: <strong className="font-mono text-[11px] text-indigo-700">ni jia you ji kou ren?</strong> = quantas pessoas tem na sua família?).</li>
