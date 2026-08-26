@@ -11,7 +11,7 @@ import {
   Briefcase, Tag, Trash2, ArrowRight, Book, Cat, Dog, 
   Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
-  Home, Heart, Smile
+  Home, Heart, Smile, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -675,6 +675,22 @@ export default function App() {
     return words;
   }, [searchQuery, availableWords]);
 
+  // All words matching the search query in the entire vocabulary
+  const matchingDictionaryWords = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return WORDS.filter(w => 
+      w.label.toLowerCase().includes(q) || 
+      w.hanzi.includes(q) || 
+      w.translation.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
+
+  // Words matching search query that cannot be inserted at this grammatical position
+  const unavailableMatchingWords = useMemo(() => {
+    return matchingDictionaryWords.filter(w => !availableWords.some(aw => aw.id === w.id));
+  }, [matchingDictionaryWords, availableWords]);
+
   // Get background color for categories
   const getCategoryBg = (category: string) => {
     switch (category) {
@@ -751,9 +767,16 @@ export default function App() {
         {/* Word Palette Board (Available words right below search bar) */}
         {filteredWords.length > 0 && (
           <div className="flex flex-col gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-            <div className="flex items-center gap-2 text-slate-600 font-semibold">
-              <PlusSquare className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-600 font-semibold">
+                <PlusSquare className="w-4 h-4 text-indigo-600" />
+                <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
+              </div>
+              {searchQuery && unavailableMatchingWords.length > 0 && (
+                <span className="text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200/70 px-2 py-0.5 rounded-lg">
+                  {unavailableMatchingWords.length} indisponível(is) pela ordem gramatical
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1">
@@ -783,6 +806,61 @@ export default function App() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Feedback when search finds existing words that cannot be inserted at current grammar stage */}
+        {searchQuery.trim() !== '' && filteredWords.length === 0 && matchingDictionaryWords.length > 0 && (
+          <div className="flex flex-col gap-3.5 bg-amber-50/90 border-2 border-amber-200/90 rounded-2xl p-5 shadow-sm text-slate-800">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-sm font-semibold text-amber-950">
+                  A palavra existe, mas não pode ser inserida porque não está na ordem correta para formar uma frase.
+                </p>
+                <p className="text-xs text-amber-800/80 mt-1">
+                  A estrutura gramatical do mandarim exige uma sequência ordenada (ex: Sujeito + Verbo + Objeto, ou Sujeito + Adjetivo). Siga a sequência gramatical para poder utilizá-la.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-amber-200/70 pt-3 flex flex-col gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                Palavra(s) encontrada(s) no vocabulário:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {matchingDictionaryWords.map(word => {
+                  const Icon = word.icon;
+                  return (
+                    <div
+                      key={word.id}
+                      className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-white/90 opacity-70 cursor-not-allowed select-none"
+                      title="Não permitida na posição gramatical atual"
+                    >
+                      <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-amber-700 font-bold leading-none">{word.label}</span>
+                        <span className="font-semibold text-sm truncate mt-0.5 text-slate-800">{word.hanzi}</span>
+                        <span className="text-[10px] text-slate-500 truncate leading-none mt-0.5">{word.translation}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Feedback when searched word does not exist in vocabulary at all */}
+        {searchQuery.trim() !== '' && filteredWords.length === 0 && matchingDictionaryWords.length === 0 && (
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 text-center text-slate-500 flex flex-col items-center justify-center gap-1.5">
+            <HelpCircle className="w-6 h-6 text-slate-400 mb-1" />
+            <p className="text-sm font-medium">Nenhuma palavra encontrada para "{searchQuery}"</p>
+            <p className="text-xs text-slate-400">Verifique a ortografia do pinyin, ideograma ou tradução em português.</p>
           </div>
         )}
 
