@@ -11,7 +11,8 @@ import {
   Briefcase, Tag, Trash2, ArrowRight, Book, Cat, Dog, 
   Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
-  Home, Heart, Smile, AlertCircle
+  Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
+  ListOrdered, PauseCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -182,477 +183,1118 @@ const WORDS: Word[] = [
   { id: 'xie_xie', label: 'xie xie', hanzi: '谢谢', translation: 'obrigado', category: 'etiquette', icon: UserCheck },
 ];
 
+// Map of multi-word / compound pinyins to dictionary ID
+const COMPOUND_PINYIN_MAP: Record<string, string> = {
+  'xie xie': 'xie_xie',
+  'xiexie': 'xie_xie',
+  'ke yi': 'keyi',
+  'keyi': 'keyi',
+  'duo shao': 'duoshao',
+  'duoshao': 'duoshao',
+  'ming zi': 'mingzi',
+  'mingzi': 'mingzi',
+  'tong xue': 'tongxue',
+  'tongxue': 'tongxue',
+  'lao shi': 'laoshi',
+  'laoshi': 'laoshi',
+  'peng you': 'pengyou',
+  'pengyou': 'pengyou',
+  'xue sheng': 'xuesheng',
+  'xuesheng': 'xuesheng',
+  'xue xiao': 'xuexiao',
+  'xuexiao': 'xuexiao',
+  'da xue': 'daxue',
+  'daxue': 'daxue',
+  'dian hua': 'dianhua',
+  'dianhua': 'dianhua',
+  'hao ma': 'haoma',
+  'haoma': 'haoma',
+  'you jian': 'youjian',
+  'youjian': 'youjian',
+  'gong zuo': 'gongzuo',
+  'gongzuo': 'gongzuo',
+  'jia na da': 'jianada',
+  'jianada': 'jianada',
+  'pu tao ya': 'putaoya',
+  'putaoya': 'putaoya',
+  'ba xi': 'baxi',
+  'baxi': 'baxi',
+  'gao xing': 'gaoxing',
+  'gaoxing': 'gaoxing',
+  'cong ming': 'congming',
+  'congming': 'congming',
+  'piao liang': 'piaoliang',
+  'piaoliang': 'piaoliang',
+  'mi fan': 'mifan',
+  'mifan': 'mifan',
+  'mian bao': 'mianbao',
+  'mianbao': 'mianbao',
+  'zhi dao': 'zhidao',
+  'zhidao': 'zhidao',
+  'zen me yang': 'zenmeyang',
+  'zenmeyang': 'zenmeyang',
+  'na li': 'nali',
+  'nali': 'nali',
+  'shen me': 'shenme',
+  'shenme': 'shenme',
+  'ba ba': 'baba',
+  'baba': 'baba',
+  'ma ma': 'mama',
+  'mama': 'mama',
+  'ge ge': 'gege',
+  'gege': 'gege',
+  'jie jie': 'jiejie',
+  'jiejie': 'jiejie',
+  'di di': 'didi',
+  'didi': 'didi',
+  'mei mei': 'meimei',
+  'meimei': 'meimei',
+  'ye ye': 'yeye',
+  'yeye': 'yeye',
+  'nai nai': 'nainai',
+  'nainai': 'nainai',
+};
+
+// Helper to check if a sequence of words forms a valid/complete sentence
+function checkIsValid(seq: Word[]): boolean {
+  if (seq.length === 0) return false;
+  const last = seq[seq.length - 1];
+
+  // If it ends with a question particle or question pronoun (except 'na' and 'ji')
+  if (last.category === 'question' && last.id !== 'na' && last.id !== 'ji') return true;
+
+  // Check if the sentence has an interrogative particle or word
+  const hasQuestion = seq.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji', 'ma'].includes(w.id));
+  const verbExists = seq.some(w => w.category === 'verb');
+
+  // If last is noun, country, suffix, adjective, number, thing, family
+  if (['noun', 'country', 'suffix', 'adjective', 'number', 'thing', 'family'].includes(last.category)) {
+    // Exception: standalone country names baxi, jianada, putaoya need a suffix or noun
+    if (['baxi', 'jianada', 'putaoya'].includes(last.id)) return false;
+    if (last.id === 'nan' || last.id === 'nü') return false;
+    if (last.id === 'dianhua') return seq.some(w => w.id === 'da_call');
+    
+    // If last is 'ren' (e.g. 'wo jia you si kou ren', 'ni jia you ji kou ren', 'wo shi baxi ren')
+    if (last.id === 'ren') return true;
+
+    // If last is family member or thing or noun, valid if there is a verb or adjective or question
+    if (['family', 'thing', 'noun'].includes(last.category)) {
+      if (verbExists || seq.some(w => w.category === 'adjective') || hasQuestion) {
+        return true;
+      }
+      return false;
+    }
+
+    if (last.category === 'adjective') return true;
+    if (last.category === 'number') return true;
+    return true;
+  }
+
+  // If it's a verb, but NOT transitive verbs requiring objects
+  if (last.category === 'verb') {
+    if (['shi', 'shuo', 'jiao', 'xihuan', 'zai', 'keyi', 'da_call', 'fa_verb', 'zhidao', 'he', 'you_verb'].includes(last.id)) {
+      return false;
+    }
+    return true;
+    // 'zuo' (sentar), 'jin' (entrar) are valid intransitive endings!
+  }
+
+  // If ending in etiquette like xie xie
+  if (last.id === 'xie_xie') return true;
+
+  return false;
+}
+
+// Pure function returning all allowed words for a given sequence
+function getAvailableWordsForSequence(sequence: Word[]): Word[] {
+  const getBaseWords = (): Word[] => {
+    if (sequence.length === 0) {
+      // Can start with pronoun, etiquette, shei, family members, or jia
+      return WORDS.filter(w => 
+        w.category === 'pronoun' || 
+        w.category === 'etiquette' || 
+        w.category === 'family' ||
+        w.id === 'shei'
+      );
+    }
+
+    const last = sequence[sequence.length - 1];
+    const prev = sequence.length > 1 ? sequence[sequence.length - 2] : null;
+    
+    // Find active verb in the sequence
+    const activeVerb = [...sequence].reverse().find(w => w.category === 'verb');
+    const verbExists = sequence.some(w => w.category === 'verb');
+    const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id));
+
+    // Case: shei selected as subject
+    if (last.id === 'shei' && !verbExists) {
+      return WORDS.filter(w => w.category === 'verb' || w.category === 'adverb');
+    }
+
+    // Case: Etiquette selected
+    if (last.category === 'etiquette') {
+      if (last.id === 'qing') {
+        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
+      }
+      if (last.id === 'xie_xie') {
+        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family');
+      }
+      return [];
+    }
+
+    // Case: Preposition selected (ex: gei)
+    if (last.category === 'preposition') {
+      if (last.id === 'gei') {
+        // Must be followed by recipient (pronoun, noun, family)
+        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun' || w.category === 'family');
+      }
+      return [];
+    }
+
+    // Case: Conjunction selected (ex: he_conj)
+    if (last.category === 'conjunction') {
+      if (last.id === 'he_conj') {
+        // Must be followed by pronoun, noun, family, thing, country
+        return WORDS.filter(w => {
+          if (['pronoun', 'noun', 'family', 'thing', 'country'].includes(w.category)) {
+            return !['zhe', 'na_dem', 'nan', 'nü', 'dianhua', 'haoma', 'gongzuo'].includes(w.id);
+          }
+          return false;
+        });
+      }
+      return [];
+    }
+
+    // Case: Pronoun selected (wo, ni, ta, zhe, na_dem)
+    if (last.category === 'pronoun') {
+      // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
+      if (prev?.category === 'preposition' && prev.id === 'gei') {
+        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+      }
+
+      // If a verb exists in the sequence (Pronoun as Object)
+      if (verbExists) {
+        if (activeVerb?.id === 'xihuan') {
+          return WORDS.filter(w => {
+            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+            return false;
+          });
+        }
+        
+        return WORDS.filter(w => {
+          if (['plural', 'possessive'].includes(w.category)) return true;
+          if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+          return false;
+        });
+      } else {
+        // Pronoun as Subject:
+        // Rule 1: Dispensa o possessivo "de" para elementos da família e casa (wo jia, wo baba, etc.)
+        return WORDS.filter(w => {
+          // Can take family members directly or jia
+          if (w.category === 'family') return true;
+          // Can take plural (except for 'zhe' and 'na_dem')
+          if (w.category === 'plural' && last.id !== 'zhe' && last.id !== 'na_dem') return true;
+          if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
+          if (w.category === 'preposition') return true; // ex: wo gei ...
+          if (['zhe', 'na_dem'].includes(last.id)) {
+            if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun') return true;
+          }
+          return false;
+        });
+      }
+    }
+
+    // Case: Family & Home selected (jia, baba, mama, gege, jiejie, didi, meimei, yeye, nainai)
+    if (last.category === 'family') {
+      // If recipient after preposition 'gei' (ex: wo gei mama...)
+      if (prev?.category === 'preposition' && prev.id === 'gei') {
+        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+      }
+
+      // If last is 'jia' (casa / família)
+      if (last.id === 'jia') {
+        return WORDS.filter(w => {
+          if (w.category === 'verb') return true; // ex: you_verb, shi, zai
+          if (w.category === 'adverb') return true; // ex: hen, dou, ye, bu
+          if (w.category === 'possessive') return true; // ex: jia de...
+          if (['zenmeyang', 'duoshao'].includes(w.id)) return true;
+          return false;
+        });
+      }
+
+      // Family member as object (after verb)
+      if (verbExists) {
+        return WORDS.filter(w => {
+          if (w.category === 'plural' || w.category === 'possessive') return true;
+          if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+          return false;
+        });
+      }
+
+      // Family member as subject (before verb)
+      return WORDS.filter(w => {
+        if (w.category === 'plural' || w.category === 'possessive') return true;
+        if (['adverb', 'verb', 'adjective', 'preposition'].includes(w.category)) return true;
+        return false;
+      });
+    }
+
+    // Case: Plural selected (men)
+    if (last.category === 'plural') {
+      if (verbExists) {
+        return WORDS.filter(w => {
+          if (w.category === 'possessive') return true;
+          if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
+          return false;
+        });
+      } else {
+        return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category));
+      }
+    }
+
+    // Case: Possessive selected (de)
+    if (last.category === 'possessive') {
+      // Must be followed by noun, country, thing, family, or adjective (compound)
+      return WORDS.filter(w => ['noun', 'country', 'thing', 'family', 'adjective'].includes(w.category));
+    }
+
+    // Case: Adverb selected (hen, bu, dou, ye, zhi)
+    if (last.category === 'adverb') {
+      if (last.id === 'hen') {
+        return WORDS.filter(w => w.category === 'adjective');
+      }
+      if (last.id === 'bu') {
+        return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
+      }
+      return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
+    }
+
+    // Case: Verb selected
+    if (last.category === 'verb') {
+      if (last.id === 'you_verb') {
+        // you can take numbers, question particles (ji, shenme, duoshao), classifiers, family members, things, nouns
+        return WORDS.filter(w => {
+          if (['number', 'classifier', 'family', 'thing', 'noun'].includes(w.category)) return true;
+          if (['ji', 'shenme', 'duoshao', 'shei'].includes(w.id)) return true;
+          if (w.category === 'pronoun' && !['zhe', 'na_dem'].includes(w.id)) return true;
+          return false;
+        });
+      }
+
+      if (last.id === 'xihuan') {
+        const subjectPronoun = sequence.find(w => w.category === 'pronoun');
+        return WORDS.filter(w => {
+          if (['thing', 'family'].includes(w.category)) return true;
+          if (w.category === 'question') return ['shei', 'shenme'].includes(w.id);
+          if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
+          return false;
+        });
+      }
+
+      if (last.id === 'shuo') {
+        return WORDS.filter(w => {
+          if (w.id === 'na' || w.id === 'shenme') return true;
+          if (w.category === 'country') {
+            return !['baxi', 'jianada'].includes(w.id);
+          }
+          if (w.category === 'pronoun') return true;
+          return false;
+        });
+      }
+
+      if (last.id === 'jiao') {
+        return WORDS.filter(w => w.id === 'shenme' || w.category === 'noun' || w.category === 'pronoun');
+      }
+
+      if (last.id === 'zai') {
+        return WORDS.filter(w => w.id === 'nali' || ['xuexiao', 'daxue', 'country'].includes(w.category) || w.id === 'jia');
+      }
+
+      if (last.id === 'keyi') {
+        return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id) || w.id === 'gei');
+      }
+
+      if (last.id === 'da_call') {
+        return WORDS.filter(w => w.id === 'dianhua');
+      }
+
+      if (last.id === 'fa_verb') {
+        return WORDS.filter(w => w.id === 'youjian');
+      }
+
+      if (last.id === 'zhidao') {
+        return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question', 'family'].includes(w.category));
+      }
+
+      if (last.id === 'he') {
+        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
+      }
+
+      // Default verb output (e.g. 'shi'): can follow with nouns, countries, pronouns, family, questions, things, numbers
+      return WORDS.filter(w => {
+        if (['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id)) return true;
+        if (['noun', 'country', 'pronoun', 'thing', 'family', 'number'].includes(w.category)) return true;
+        return false;
+      });
+    }
+
+    // Case: Question particles
+    if (last.category === 'question') {
+      if (last.id === 'ji') {
+        // 'ji' is question particle for quantity (family/things < 10)
+        // Followed by: classifier (kou, ge_class), family members directly, things, or nouns (ren, etc.)
+        return WORDS.filter(w => {
+          if (w.category === 'classifier') return true;
+          if (w.category === 'family' && w.id !== 'jia') return true;
+          if (['ren', 'pengyou', 'tongxue', 'xuesheng', 'laoshi'].includes(w.id)) return true;
+          if (['shu', 'mao', 'gou'].includes(w.id)) return true;
+          return false;
+        });
+      }
+
+      if (last.id === 'na' || last.id === 'shenme') {
+        return WORDS.filter(w => {
+          if (last.id === 'na' && w.id === 'guo') return true;
+          if (w.category === 'country' && activeVerb?.id === 'shuo') {
+            return !['baxi', 'jianada'].includes(w.id);
+          }
+          if (last.id === 'shenme' && w.id === 'mingzi') return true;
+          if (last.id === 'shenme' && w.id === 'gongzuo') return true;
+          return ['noun', 'country', 'thing', 'family'].includes(w.category);
+        });
+      }
+    }
+
+    // Case: Classifiers (kou, ge_class)
+    if (last.category === 'classifier') {
+      if (last.id === 'kou') {
+        // kou -> ren (most common family measure: kou ren) or family members
+        return WORDS.filter(w => w.id === 'ren' || (w.category === 'family' && w.id !== 'jia'));
+      }
+      if (last.id === 'ge_class') {
+        // ge -> family members, nouns, things, suffix ren
+        return WORDS.filter(w => {
+          if (w.category === 'family' && w.id !== 'jia') return true;
+          if (['noun', 'thing'].includes(w.category)) {
+            return !['nan', 'nü', 'haoma', 'dianhua'].includes(w.id);
+          }
+          if (w.id === 'ren') return true;
+          return false;
+        });
+      }
+    }
+
+    // Case: Country selected
+    if (last.category === 'country') {
+      if (last.requiresGuo && activeVerb?.id === 'shi') {
+        return WORDS.filter(w => w.id === 'guo');
+      }
+      
+      return WORDS.filter(w => {
+        if (w.category !== 'suffix') return false;
+        const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
+
+        if (activeVerb?.id === 'shuo') {
+          return w.id === 'yu' && supportsLanguageSuffix;
+        }
+        if (activeVerb?.id === 'shi') {
+          return w.id === 'ren';
+        }
+        return true;
+      });
+    }
+
+    // Case: Guo selected
+    if (last.category === 'guo') {
+      return WORDS.filter(w => w.id === 'ren');
+    }
+
+    // Case: Suffix, Noun, Thing, Adjective, Number
+    if (
+      last.category === 'suffix' || 
+      last.category === 'noun' || 
+      last.category === 'thing' || 
+      last.category === 'adjective' ||
+      last.category === 'number'
+    ) {
+      // Sub-rules for nested noun compound combinations
+      if (prev?.category === 'preposition' && prev.id === 'gei') {
+        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+      }
+
+      if (last.id === 'nan' || last.id === 'nü') {
+        return WORDS.filter(w => w.id === 'pengyou');
+      }
+      if (last.id === 'dianhua') {
+        return WORDS.filter(w => w.id === 'haoma' || w.id === 'da_call');
+      }
+      if (last.id === 'haoma') {
+        return WORDS.filter(w => w.id === 'duoshao' || w.category === 'number' || w.id === 'shi');
+      }
+      if (last.id === 'gongzuo') {
+        return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
+      }
+
+      // If number selected (e.g. si, liang, er, san...):
+      // Can be followed by classifier (kou, ge_class), family members directly (ex: wo you liang didi), things (liang mao), nouns (ren), or other digits (phone number)
+      if (last.category === 'number') {
+        return WORDS.filter(w => {
+          if (w.category === 'classifier') return true;
+          if (w.category === 'family' && w.id !== 'jia') return true;
+          if (['thing', 'number'].includes(w.category)) return true;
+          if (['ren', 'pengyou', 'xuesheng', 'laoshi'].includes(w.id)) return true;
+          if (w.id === 'ma') return true;
+          return false;
+        });
+      }
+
+      // General endings
+      const isComposto = sequence.some(w => w.category === 'possessive');
+      if (!verbExists && isComposto && last.category !== 'adjective') {
+        return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
+      }
+
+      // Questions are final, but can have 'ma' if not a question already
+      if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
+        return WORDS.filter(w => w.id === 'ma');
+      }
+
+      return [];
+    }
+
+    return [];
+  };
+
+  const baseWords = getBaseWords();
+  let finalWords = [...baseWords];
+
+  // Leave question particles (like 'ma') available after standard complete sentence is formed
+  if (checkIsValid(sequence)) {
+    const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id));
+    const hasMa = sequence.some(w => w.id === 'ma');
+    if (!hasQuestion && !hasMa) {
+      const maWord = WORDS.find(w => w.id === 'ma');
+      if (maWord && !finalWords.some(w => w.id === 'ma')) {
+        finalWords.push(maWord);
+      }
+    }
+  }
+
+  if (sequence.length > 0) {
+    const last = sequence[sequence.length - 1];
+    
+    // Rule for adding 'he_conj' (conjunction "e")
+    const nounCategories = ['suffix', 'noun', 'thing', 'country', 'pronoun', 'family'];
+    const restrictedIds = ['zhe', 'na_dem', 'nan', 'nü', 'dianhua', 'haoma', 'gongzuo'];
+    if (nounCategories.includes(last.category) && !restrictedIds.includes(last.id)) {
+      const heConjWord = WORDS.find(w => w.id === 'he_conj');
+      if (heConjWord && !finalWords.some(w => w.id === 'he_conj')) {
+        finalWords.push(heConjWord);
+      }
+    }
+
+    // Rule for adding 'ye' (também) as a clause connector
+    if (checkIsValid(sequence) && last.category !== 'question' && last.id !== 'xie_xie' && last.id !== 'qing') {
+      const yeWord = WORDS.find(w => w.id === 'ye');
+      if (yeWord && !finalWords.some(w => w.id === 'ye')) {
+        finalWords.push(yeWord);
+      }
+    }
+  }
+
+  return finalWords;
+}
+
+// Function to normalize pinyin / search text (remove diacritics, lowercase, strip punctuation)
+function normalizePinyinText(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fa5]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Calculate Levenshtein edit distance between two strings
+function levenshteinDistance(a: string, b: string): number {
+  const al = a.length;
+  const bl = b.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+
+  const dp: number[][] = [];
+  for (let i = 0; i <= al; i++) {
+    dp[i] = [i];
+  }
+  for (let j = 0; j <= bl; j++) {
+    dp[0][j] = j;
+  }
+
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1, // deletion
+        dp[i][j - 1] + 1, // insertion
+        dp[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+  return dp[al][bl];
+}
+
+// Find candidate words in vocabulary for a given token (exact match)
+function findCandidatesForToken(rawToken: string): Word[] {
+  const norm = normalizePinyinText(rawToken);
+  if (!norm && !rawToken.trim()) return [];
+
+  // 1. Check compound pinyin map
+  const mappedId = COMPOUND_PINYIN_MAP[norm];
+  if (mappedId) {
+    const word = WORDS.find(w => w.id === mappedId);
+    if (word) return [word];
+  }
+
+  // 2. Direct Hanzi match
+  const hanziMatches = WORDS.filter(w => w.hanzi === rawToken.trim());
+  if (hanziMatches.length > 0) return hanziMatches;
+
+  // 3. Direct ID match
+  const idMatches = WORDS.filter(w => w.id === norm);
+  if (idMatches.length > 0) return idMatches;
+
+  // 4. Normalized Label match
+  const labelMatches = WORDS.filter(w => normalizePinyinText(w.label) === norm);
+  if (labelMatches.length > 0) return labelMatches;
+
+  // 5. Special aliases (nu/nv for nü)
+  if (norm === 'nu' || norm === 'nv') {
+    const nuWord = WORDS.find(w => w.id === 'nü');
+    if (nuWord) return [nuWord];
+  }
+
+  // 6. Portuguese exact translation match
+  const transMatches = WORDS.filter(w => normalizePinyinText(w.translation) === norm);
+  if (transMatches.length > 0) return transMatches;
+
+  return [];
+}
+
+// Find closest word in vocabulary for a given misspelled or approximate token
+function findClosestWordForToken(
+  rawToken: string,
+  previousWords: Word[] = []
+): { word: Word; score: number; pinyinKey: string } | null {
+  const norm = normalizePinyinText(rawToken);
+  if (!norm) return null;
+
+  // Words that are grammatically allowed after previousWords (if provided)
+  const allowed = previousWords.length > 0 ? getAvailableWordsForSequence(previousWords) : [];
+
+  let bestMatch: { word: Word; score: number; pinyinKey: string } | null = null;
+  let highestScore = -Infinity;
+
+  for (const word of WORDS) {
+    const wordPinyins = [
+      normalizePinyinText(word.label),
+      normalizePinyinText(word.id.replace(/_.*$/, '')),
+    ];
+
+    // Add compound pinyin keys
+    for (const [mapKey, mappedId] of Object.entries(COMPOUND_PINYIN_MAP)) {
+      if (mappedId === word.id) {
+        wordPinyins.push(mapKey);
+      }
+    }
+
+    const isGrammaticallyAllowed = allowed.some(aw => aw.id === word.id);
+
+    for (const targetPinyin of wordPinyins) {
+      if (!targetPinyin) continue;
+
+      const dist = levenshteinDistance(norm, targetPinyin);
+      const maxLen = Math.max(norm.length, targetPinyin.length);
+      
+      const maxAllowedDist = maxLen <= 3 ? 1 : maxLen <= 5 ? 2 : 3;
+      if (dist > maxAllowedDist) continue;
+
+      // Base score
+      let score = 1 - (dist / maxLen);
+
+      // Prefix match bonus (e.g. "xihua" -> "xihuan", "laosh" -> "laoshi")
+      if (targetPinyin.startsWith(norm) || norm.startsWith(targetPinyin)) {
+        score += 0.25;
+      }
+
+      // Substring bonus
+      if (targetPinyin.includes(norm) || norm.includes(targetPinyin)) {
+        score += 0.15;
+      }
+
+      // Vowel / diphthong similarity (e.g. "ko" vs "kou", "ho" vs "hao", "she" vs "shei", "laosh" vs "laoshi")
+      if (
+        (norm.endsWith('o') && targetPinyin.endsWith('ou')) ||
+        (norm.endsWith('o') && targetPinyin.endsWith('ao')) ||
+        (norm.endsWith('e') && targetPinyin.endsWith('ei')) ||
+        (norm.endsWith('n') && targetPinyin.endsWith('ng')) ||
+        (norm.startsWith('sh') && targetPinyin.startsWith('s')) ||
+        (norm.startsWith('zh') && targetPinyin.startsWith('z')) ||
+        (norm.startsWith('ch') && targetPinyin.startsWith('c'))
+      ) {
+        score += 0.25;
+      }
+
+      // Grammatical alignment bonus (e.g. after "si", measure word "kou" is expected)
+      if (isGrammaticallyAllowed) {
+        score += 0.40;
+      }
+
+      if (score > highestScore && score >= 0.45) {
+        highestScore = score;
+        bestMatch = {
+          word,
+          score,
+          pinyinKey: targetPinyin,
+        };
+      }
+    }
+
+    // Check Portuguese translation similarity (e.g. "obrigdo" -> "obrigado")
+    const normTrans = normalizePinyinText(word.translation);
+    const transDist = levenshteinDistance(norm, normTrans);
+    const transMaxLen = Math.max(norm.length, normTrans.length);
+    if (transDist <= 2 && transMaxLen > 3) {
+      let transScore = (1 - transDist / transMaxLen) + (isGrammaticallyAllowed ? 0.35 : 0);
+      if (transScore > highestScore && transScore >= 0.5) {
+        highestScore = transScore;
+        bestMatch = {
+          word,
+          score: transScore,
+          pinyinKey: word.label,
+        };
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+export interface DidYouMeanPart {
+  text: string;
+  isChanged: boolean;
+  word?: Word;
+}
+
+export interface DidYouMeanResult {
+  originalQuery: string;
+  suggestedText: string;
+  parts: DidYouMeanPart[];
+  hasCorrections: boolean;
+  suggestedWords: Word[];
+}
+
+// Generate "Did you mean" suggestion for search queries / full phrases
+function getDidYouMeanSuggestion(input: string, currentActiveSequence: Word[] = []): DidYouMeanResult | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const tokens = tokenizePhraseInput(trimmed);
+  if (tokens.length === 0) return null;
+
+  const parts: DidYouMeanPart[] = [];
+  const suggestedTokens: string[] = [];
+  const suggestedWords: Word[] = [];
+  let hasCorrections = false;
+  let trackedSeq: Word[] = [...currentActiveSequence];
+
+  // Case 1: Single token search
+  if (tokens.length === 1) {
+    const rawToken = tokens[0];
+    const exactMatches = findCandidatesForToken(rawToken);
+
+    // If exact match already exists in dictionary, no correction needed
+    if (exactMatches.length > 0) {
+      return null;
+    }
+
+    const closest = findClosestWordForToken(rawToken, currentActiveSequence);
+    if (closest) {
+      const suggestedPinyin = closest.pinyinKey || closest.word.label;
+      return {
+        originalQuery: input,
+        suggestedText: suggestedPinyin,
+        parts: [{
+          text: suggestedPinyin.toUpperCase(),
+          isChanged: true,
+          word: closest.word,
+        }],
+        hasCorrections: true,
+        suggestedWords: [closest.word],
+      };
+    }
+    return null;
+  }
+
+  // Case 2: Multi-word phrase query (e.g. "wo jia you si ko ren")
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const exactMatches = findCandidatesForToken(token);
+
+    if (exactMatches.length > 0) {
+      // Valid word found
+      const allowed = getAvailableWordsForSequence(trackedSeq);
+      const validMatch = exactMatches.find(c => allowed.some(a => a.id === c.id)) || exactMatches[0];
+
+      trackedSeq.push(validMatch);
+      suggestedWords.push(validMatch);
+      suggestedTokens.push(token);
+      parts.push({
+        text: token,
+        isChanged: false,
+        word: validMatch,
+      });
+    } else {
+      // Token is misspelled (e.g. "ko" in "wo jia you si ko ren")
+      const closest = findClosestWordForToken(token, trackedSeq);
+      if (closest) {
+        hasCorrections = true;
+        const replacementPinyin = closest.pinyinKey || closest.word.label;
+        suggestedTokens.push(replacementPinyin);
+        suggestedWords.push(closest.word);
+        trackedSeq.push(closest.word);
+        parts.push({
+          text: replacementPinyin.toUpperCase(), // Highlight in UPPERCASE (e.g. KOU)
+          isChanged: true,
+          word: closest.word,
+        });
+      } else {
+        // Unknown token without close match
+        suggestedTokens.push(token);
+        parts.push({
+          text: token,
+          isChanged: false,
+        });
+      }
+    }
+  }
+
+  if (!hasCorrections) {
+    return null;
+  }
+
+  const suggestedText = suggestedTokens.join(' ');
+  return {
+    originalQuery: input,
+    suggestedText,
+    parts,
+    hasCorrections: true,
+    suggestedWords,
+  };
+}
+
+// Split input string into tokens (supporting Hanzi or Pinyin words)
+function tokenizePhraseInput(input: string): string[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  // If input contains Chinese characters, greedily match against dictionary
+  const hasChinese = /[\u4e00-\u9fa5]/.test(trimmed);
+  if (hasChinese) {
+    const hanziDict = [...WORDS].sort((a, b) => b.hanzi.length - a.hanzi.length);
+    const tokens: string[] = [];
+    let i = 0;
+    while (i < trimmed.length) {
+      if (/[ \t\n\r,，.。!！?？"']/.test(trimmed[i])) {
+        i++;
+        continue;
+      }
+      let matched = false;
+      for (const w of hanziDict) {
+        if (trimmed.startsWith(w.hanzi, i)) {
+          tokens.push(w.hanzi);
+          i += w.hanzi.length;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        tokens.push(trimmed[i]);
+        i++;
+      }
+    }
+    return tokens;
+  }
+
+  // Latin / Pinyin tokenization
+  const rawWords = trimmed
+    .split(/[\s,，.。!！?？"'\-]+/)
+    .map(w => w.trim())
+    .filter(Boolean);
+
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < rawWords.length) {
+    // Try 3-word window
+    if (i + 2 < rawWords.length) {
+      const triKey = `${normalizePinyinText(rawWords[i])} ${normalizePinyinText(rawWords[i + 1])} ${normalizePinyinText(rawWords[i + 2])}`;
+      if (COMPOUND_PINYIN_MAP[triKey]) {
+        tokens.push(`${rawWords[i]} ${rawWords[i + 1]} ${rawWords[i + 2]}`);
+        i += 3;
+        continue;
+      }
+    }
+    // Try 2-word window
+    if (i + 1 < rawWords.length) {
+      const biKey = `${normalizePinyinText(rawWords[i])} ${normalizePinyinText(rawWords[i + 1])}`;
+      if (COMPOUND_PINYIN_MAP[biKey]) {
+        tokens.push(`${rawWords[i]} ${rawWords[i + 1]}`);
+        i += 2;
+        continue;
+      }
+    }
+    // Single word
+    tokens.push(rawWords[i]);
+    i++;
+  }
+
+  return tokens;
+}
+
+export interface PhraseValidationStep {
+  token: string;
+  word: Word | null;
+  status: 'valid' | 'invalid_grammar' | 'unknown_word' | 'unprocessed';
+  errorMessage?: string;
+  ruleHint?: string;
+  position: number;
+}
+
+export interface PhraseValidationReport {
+  rawInput: string;
+  steps: PhraseValidationStep[];
+  success: boolean;
+  stoppedAtIndex: number | null;
+  errorReason?: string;
+  validWords: Word[];
+  isCompleteSentence: boolean;
+  suggestion?: DidYouMeanResult | null;
+}
+
+// Function to validate and assemble a full phrase token by token
+function validateAndBuildPhrase(input: string): PhraseValidationReport {
+  const tokens = tokenizePhraseInput(input);
+  if (tokens.length === 0) {
+    return {
+      rawInput: input,
+      steps: [],
+      success: false,
+      stoppedAtIndex: null,
+      validWords: [],
+      isCompleteSentence: false,
+      suggestion: null,
+    };
+  }
+
+  const steps: PhraseValidationStep[] = [];
+  const currentSeq: Word[] = [];
+
+  for (let i = 0; i < tokens.length; i++) {
+    const rawToken = tokens[i];
+    const candidates = findCandidatesForToken(rawToken);
+
+    if (candidates.length === 0) {
+      // Word does not exist in dictionary - try to find closest match
+      const closest = findClosestWordForToken(rawToken, currentSeq);
+      const suggestionText = closest
+        ? ` Você quis dizer "${closest.pinyinKey || closest.word.label}" (${closest.word.hanzi} - ${closest.word.translation})?`
+        : '';
+
+      steps.push({
+        token: rawToken,
+        word: closest ? closest.word : null,
+        status: 'unknown_word',
+        errorMessage: `A palavra "${rawToken}" (posição ${i + 1}) não foi encontrada no vocabulário.${suggestionText}`,
+        ruleHint: closest
+          ? `Sugestão: Substitua "${rawToken}" por "${closest.pinyinKey || closest.word.label}" (${closest.word.hanzi} - ${closest.word.translation}).`
+          : 'Verifique a ortografia do pinyin, ideograma ou significado.',
+        position: i + 1,
+      });
+
+      // Mark remaining tokens as unprocessed
+      for (let j = i + 1; j < tokens.length; j++) {
+        steps.push({
+          token: tokens[j],
+          word: null,
+          status: 'unprocessed',
+          position: j + 1,
+        });
+      }
+
+      const suggestion = getDidYouMeanSuggestion(input, []);
+
+      return {
+        rawInput: input,
+        steps,
+        success: false,
+        stoppedAtIndex: i,
+        errorReason: `A palavra "${rawToken}" não foi encontrada no vocabulário.${suggestionText}`,
+        validWords: currentSeq,
+        isCompleteSentence: checkIsValid(currentSeq),
+        suggestion,
+      };
+    }
+
+    // Get available words for current sequence state
+    const allowed = getAvailableWordsForSequence(currentSeq);
+    
+    // Check if any candidate is in allowed words
+    const validCandidate = candidates.find(c => allowed.some(aw => aw.id === c.id));
+
+    if (validCandidate) {
+      // Step is grammatically valid!
+      currentSeq.push(validCandidate);
+      steps.push({
+        token: rawToken,
+        word: validCandidate,
+        status: 'valid',
+        position: i + 1,
+      });
+    } else {
+      // Word exists, BUT cannot be placed in this grammatical position!
+      const candidate = candidates[0];
+      let explanation = '';
+      if (i === 0) {
+        explanation = `A frase não pode começar com a palavra "${candidate.label}" (${candidate.hanzi} - ${candidate.translation}). No mandarim, inicie com o sujeito (pronome, membro da família ou expressão de cortesia).`;
+      } else {
+        const prevWord = currentSeq[currentSeq.length - 1];
+        explanation = `Após "${prevWord.label}" (${prevWord.hanzi} - ${prevWord.translation}), a palavra "${candidate.label}" (${candidate.hanzi} - ${candidate.translation}) não é permitida pela ordem gramatical.`;
+      }
+
+      steps.push({
+        token: rawToken,
+        word: candidate,
+        status: 'invalid_grammar',
+        errorMessage: 'A palavra existe, mas não pode ser inserida porque não está na ordem correta para formar uma frase.',
+        ruleHint: explanation,
+        position: i + 1,
+      });
+
+      // Mark remaining tokens as unprocessed
+      for (let j = i + 1; j < tokens.length; j++) {
+        steps.push({
+          token: tokens[j],
+          word: null,
+          status: 'unprocessed',
+          position: j + 1,
+        });
+      }
+
+      return {
+        rawInput: input,
+        steps,
+        success: false,
+        stoppedAtIndex: i,
+        errorReason: 'A palavra existe, mas não pode ser inserida porque não está na ordem correta para formar uma frase.',
+        validWords: currentSeq,
+        isCompleteSentence: checkIsValid(currentSeq),
+        suggestion: null,
+      };
+    }
+  }
+
+  // All steps passed successfully!
+  return {
+    rawInput: input,
+    steps,
+    success: true,
+    stoppedAtIndex: null,
+    validWords: currentSeq,
+    isCompleteSentence: checkIsValid(currentSeq),
+    suggestion: null,
+  };
+}
+
 export default function App() {
   const [sequence, setSequence] = useState<Word[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [validationReport, setValidationReport] = useState<PhraseValidationReport | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const addWord = (word: Word) => {
     setSequence([...sequence, word]);
-    setSearchQuery(''); // Clear the search query after selecting a word
+    setSearchQuery('');
+    setValidationReport(null);
     
     // Focus search input on the next tick
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 0);
   };
-  const removeLast = () => setSequence(sequence.slice(0, -1));
-  const clearSequence = () => setSequence([]);
-
-  // Helper to check if a sequence of words forms a valid/complete sentence
-  const checkIsValid = (seq: Word[]) => {
-    if (seq.length === 0) return false;
-    const last = seq[seq.length - 1];
-
-    // If it ends with a question particle or question pronoun (except 'na' and 'ji')
-    if (last.category === 'question' && last.id !== 'na' && last.id !== 'ji') return true;
-
-    // Check if the sentence has an interrogative particle or word
-    const hasQuestion = seq.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji', 'ma'].includes(w.id));
-    const verbExists = seq.some(w => w.category === 'verb');
-
-    // If last is noun, country, suffix, adjective, number, thing, family
-    if (['noun', 'country', 'suffix', 'adjective', 'number', 'thing', 'family'].includes(last.category)) {
-      // Exception: standalone country names baxi, jianada, putaoya need a suffix or noun
-      if (['baxi', 'jianada', 'putaoya'].includes(last.id)) return false;
-      if (last.id === 'nan' || last.id === 'nü') return false;
-      if (last.id === 'dianhua') return seq.some(w => w.id === 'da_call');
-      
-      // If last is 'ren' (e.g. 'wo jia you si kou ren', 'ni jia you ji kou ren', 'wo shi baxi ren')
-      if (last.id === 'ren') return true;
-
-      // If last is family member or thing or noun, valid if there is a verb or adjective or question
-      if (['family', 'thing', 'noun'].includes(last.category)) {
-        if (verbExists || seq.some(w => w.category === 'adjective') || hasQuestion) {
-          return true;
-        }
-        return false;
-      }
-
-      if (last.category === 'adjective') return true;
-      if (last.category === 'number') return true;
-      return true;
-    }
-
-    // If it's a verb, but NOT transitive verbs requiring objects
-    if (last.category === 'verb') {
-      if (['shi', 'shuo', 'jiao', 'xihuan', 'zai', 'keyi', 'da_call', 'fa_verb', 'zhidao', 'he', 'you_verb'].includes(last.id)) {
-        return false;
-      }
-      return true;
-      // 'zuo' (sentar), 'jin' (entrar) are valid intransitive endings!
-    }
-
-    // If ending in etiquette like xie xie
-    if (last.id === 'xie_xie') return true;
-
-    return false;
+  const removeLast = () => {
+    setSequence(sequence.slice(0, -1));
+    setValidationReport(null);
+  };
+  const clearSequence = () => {
+    setSequence([]);
+    setValidationReport(null);
   };
 
-  // --- Rule Logic ---
+  // Available words for current sequence state
   const availableWords = useMemo(() => {
-    const getBaseWords = (): Word[] => {
-      if (sequence.length === 0) {
-        // Can start with pronoun, etiquette, shei, family members, or jia
-        return WORDS.filter(w => 
-          w.category === 'pronoun' || 
-          w.category === 'etiquette' || 
-          w.category === 'family' ||
-          w.id === 'shei'
-        );
-      }
-
-      const last = sequence[sequence.length - 1];
-      const prev = sequence.length > 1 ? sequence[sequence.length - 2] : null;
-      
-      // Find active verb in the sequence
-      const activeVerb = [...sequence].reverse().find(w => w.category === 'verb');
-      const verbExists = sequence.some(w => w.category === 'verb');
-      const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id));
-
-      // Case: shei selected as subject
-      if (last.id === 'shei' && !verbExists) {
-        return WORDS.filter(w => w.category === 'verb' || w.category === 'adverb');
-      }
-
-      // Case: Etiquette selected
-      if (last.category === 'etiquette') {
-        if (last.id === 'qing') {
-          return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id));
-        }
-        if (last.id === 'xie_xie') {
-          return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family');
-        }
-        return [];
-      }
-
-      // Case: Preposition selected (ex: gei)
-      if (last.category === 'preposition') {
-        if (last.id === 'gei') {
-          // Must be followed by recipient (pronoun, noun, family)
-          return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun' || w.category === 'family');
-        }
-        return [];
-      }
-
-      // Case: Conjunction selected (ex: he_conj)
-      if (last.category === 'conjunction') {
-        if (last.id === 'he_conj') {
-          // Must be followed by pronoun, noun, family, thing, country
-          return WORDS.filter(w => {
-            if (['pronoun', 'noun', 'family', 'thing', 'country'].includes(w.category)) {
-              return !['zhe', 'na_dem', 'nan', 'nü', 'dianhua', 'haoma', 'gongzuo'].includes(w.id);
-            }
-            return false;
-          });
-        }
-        return [];
-      }
-
-      // Case: Pronoun selected (wo, ni, ta, zhe, na_dem)
-      if (last.category === 'pronoun') {
-        // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
-        if (prev?.category === 'preposition' && prev.id === 'gei') {
-          return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
-        }
-
-        // If a verb exists in the sequence (Pronoun as Object)
-        if (verbExists) {
-          if (activeVerb?.id === 'xihuan') {
-            return WORDS.filter(w => {
-              if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-              return false;
-            });
-          }
-          
-          return WORDS.filter(w => {
-            if (['plural', 'possessive'].includes(w.category)) return true;
-            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-            return false;
-          });
-        } else {
-          // Pronoun as Subject:
-          // Rule 1: Dispensa o possessivo "de" para elementos da família e casa (wo jia, wo baba, etc.)
-          return WORDS.filter(w => {
-            // Can take family members directly or jia
-            if (w.category === 'family') return true;
-            // Can take plural (except for 'zhe' and 'na_dem')
-            if (w.category === 'plural' && last.id !== 'zhe' && last.id !== 'na_dem') return true;
-            if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
-            if (w.category === 'preposition') return true; // ex: wo gei ...
-            if (['zhe', 'na_dem'].includes(last.id)) {
-              if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun') return true;
-            }
-            return false;
-          });
-        }
-      }
-
-      // Case: Family & Home selected (jia, baba, mama, gege, jiejie, didi, meimei, yeye, nainai)
-      if (last.category === 'family') {
-        // If recipient after preposition 'gei' (ex: wo gei mama...)
-        if (prev?.category === 'preposition' && prev.id === 'gei') {
-          return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
-        }
-
-        // If last is 'jia' (casa / família)
-        if (last.id === 'jia') {
-          return WORDS.filter(w => {
-            if (w.category === 'verb') return true; // ex: you_verb, shi, zai
-            if (w.category === 'adverb') return true; // ex: hen, dou, ye, bu
-            if (w.category === 'possessive') return true; // ex: jia de...
-            if (['zenmeyang', 'duoshao'].includes(w.id)) return true;
-            return false;
-          });
-        }
-
-        // Family member as object (after verb)
-        if (verbExists) {
-          return WORDS.filter(w => {
-            if (w.category === 'plural' || w.category === 'possessive') return true;
-            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-            return false;
-          });
-        }
-
-        // Family member as subject (before verb)
-        return WORDS.filter(w => {
-          if (w.category === 'plural' || w.category === 'possessive') return true;
-          if (['adverb', 'verb', 'adjective', 'preposition'].includes(w.category)) return true;
-          return false;
-        });
-      }
-
-      // Case: Plural selected (men)
-      if (last.category === 'plural') {
-        if (verbExists) {
-          return WORDS.filter(w => {
-            if (w.category === 'possessive') return true;
-            if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-            return false;
-          });
-        } else {
-          return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category));
-        }
-      }
-
-      // Case: Possessive selected (de)
-      if (last.category === 'possessive') {
-        // Must be followed by noun, country, thing, family, or adjective (compound)
-        return WORDS.filter(w => ['noun', 'country', 'thing', 'family', 'adjective'].includes(w.category));
-      }
-
-      // Case: Adverb selected (hen, bu, dou, ye, zhi)
-      if (last.category === 'adverb') {
-        if (last.id === 'hen') {
-          return WORDS.filter(w => w.category === 'adjective');
-        }
-        if (last.id === 'bu') {
-          return WORDS.filter(w => w.category === 'verb' || w.category === 'adjective');
-        }
-        return WORDS.filter(w => w.category === 'verb' || ['hen', 'bu'].includes(w.id));
-      }
-
-      // Case: Verb selected
-      if (last.category === 'verb') {
-        if (last.id === 'you_verb') {
-          // you can take numbers, question particles (ji, shenme, duoshao), classifiers, family members, things, nouns
-          return WORDS.filter(w => {
-            if (['number', 'classifier', 'family', 'thing', 'noun'].includes(w.category)) return true;
-            if (['ji', 'shenme', 'duoshao', 'shei'].includes(w.id)) return true;
-            if (w.category === 'pronoun' && !['zhe', 'na_dem'].includes(w.id)) return true;
-            return false;
-          });
-        }
-
-        if (last.id === 'xihuan') {
-          const subjectPronoun = sequence.find(w => w.category === 'pronoun');
-          return WORDS.filter(w => {
-            if (['thing', 'family'].includes(w.category)) return true;
-            if (w.category === 'question') return ['shei', 'shenme'].includes(w.id);
-            if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
-            return false;
-          });
-        }
-
-        if (last.id === 'shuo') {
-          return WORDS.filter(w => {
-            if (w.id === 'na' || w.id === 'shenme') return true;
-            if (w.category === 'country') {
-              return !['baxi', 'jianada'].includes(w.id);
-            }
-            if (w.category === 'pronoun') return true;
-            return false;
-          });
-        }
-
-        if (last.id === 'jiao') {
-          return WORDS.filter(w => w.id === 'shenme' || w.category === 'noun' || w.category === 'pronoun');
-        }
-
-        if (last.id === 'zai') {
-          return WORDS.filter(w => w.id === 'nali' || ['xuexiao', 'daxue', 'country'].includes(w.category) || w.id === 'jia');
-        }
-
-        if (last.id === 'keyi') {
-          return WORDS.filter(w => ['zuo', 'he', 'jin'].includes(w.id) || w.id === 'gei');
-        }
-
-        if (last.id === 'da_call') {
-          return WORDS.filter(w => w.id === 'dianhua');
-        }
-
-        if (last.id === 'fa_verb') {
-          return WORDS.filter(w => w.id === 'youjian');
-        }
-
-        if (last.id === 'zhidao') {
-          return WORDS.filter(w => ['noun', 'thing', 'pronoun', 'question', 'family'].includes(w.category));
-        }
-
-        if (last.id === 'he') {
-          return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang'].includes(w.id));
-        }
-
-        // Default verb output (e.g. 'shi'): can follow with nouns, countries, pronouns, family, questions, things, numbers
-        return WORDS.filter(w => {
-          if (['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id)) return true;
-          if (['noun', 'country', 'pronoun', 'thing', 'family', 'number'].includes(w.category)) return true;
-          return false;
-        });
-      }
-
-      // Case: Question particles
-      if (last.category === 'question') {
-        if (last.id === 'ji') {
-          // 'ji' is question particle for quantity (family/things < 10)
-          // Followed by: classifier (kou, ge_class), family members directly, things, or nouns (ren, etc.)
-          return WORDS.filter(w => {
-            if (w.category === 'classifier') return true;
-            if (w.category === 'family' && w.id !== 'jia') return true;
-            if (['ren', 'pengyou', 'tongxue', 'xuesheng', 'laoshi'].includes(w.id)) return true;
-            if (['shu', 'mao', 'gou'].includes(w.id)) return true;
-            return false;
-          });
-        }
-
-        if (last.id === 'na' || last.id === 'shenme') {
-          return WORDS.filter(w => {
-            if (last.id === 'na' && w.id === 'guo') return true;
-            if (w.category === 'country' && activeVerb?.id === 'shuo') {
-              return !['baxi', 'jianada'].includes(w.id);
-            }
-            if (last.id === 'shenme' && w.id === 'mingzi') return true;
-            if (last.id === 'shenme' && w.id === 'gongzuo') return true;
-            return ['noun', 'country', 'thing', 'family'].includes(w.category);
-          });
-        }
-      }
-
-      // Case: Classifiers (kou, ge_class)
-      if (last.category === 'classifier') {
-        if (last.id === 'kou') {
-          // kou -> ren (most common family measure: kou ren) or family members
-          return WORDS.filter(w => w.id === 'ren' || (w.category === 'family' && w.id !== 'jia'));
-        }
-        if (last.id === 'ge_class') {
-          // ge -> family members, nouns, things, suffix ren
-          return WORDS.filter(w => {
-            if (w.category === 'family' && w.id !== 'jia') return true;
-            if (['noun', 'thing'].includes(w.category)) {
-              return !['nan', 'nü', 'haoma', 'dianhua'].includes(w.id);
-            }
-            if (w.id === 'ren') return true;
-            return false;
-          });
-        }
-      }
-
-      // Case: Country selected
-      if (last.category === 'country') {
-        if (last.requiresGuo && activeVerb?.id === 'shi') {
-          return WORDS.filter(w => w.id === 'guo');
-        }
-        
-        return WORDS.filter(w => {
-          if (w.category !== 'suffix') return false;
-          const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
-
-          if (activeVerb?.id === 'shuo') {
-            return w.id === 'yu' && supportsLanguageSuffix;
-          }
-          if (activeVerb?.id === 'shi') {
-            return w.id === 'ren';
-          }
-          return true;
-        });
-      }
-
-      // Case: Guo selected
-      if (last.category === 'guo') {
-        return WORDS.filter(w => w.id === 'ren');
-      }
-
-      // Case: Suffix, Noun, Thing, Adjective, Number
-      if (
-        last.category === 'suffix' || 
-        last.category === 'noun' || 
-        last.category === 'thing' || 
-        last.category === 'adjective' ||
-        last.category === 'number'
-      ) {
-        // Sub-rules for nested noun compound combinations
-        if (prev?.category === 'preposition' && prev.id === 'gei') {
-          return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
-        }
-
-        if (last.id === 'nan' || last.id === 'nü') {
-          return WORDS.filter(w => w.id === 'pengyou');
-        }
-        if (last.id === 'dianhua') {
-          return WORDS.filter(w => w.id === 'haoma' || w.id === 'da_call');
-        }
-        if (last.id === 'haoma') {
-          return WORDS.filter(w => w.id === 'duoshao' || w.category === 'number' || w.id === 'shi');
-        }
-        if (last.id === 'gongzuo') {
-          return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
-        }
-
-        // If number selected (e.g. si, liang, er, san...):
-        // Can be followed by classifier (kou, ge_class), family members directly (ex: wo you liang didi), things (liang mao), nouns (ren), or other digits (phone number)
-        if (last.category === 'number') {
-          return WORDS.filter(w => {
-            if (w.category === 'classifier') return true;
-            if (w.category === 'family' && w.id !== 'jia') return true;
-            if (['thing', 'number'].includes(w.category)) return true;
-            if (['ren', 'pengyou', 'xuesheng', 'laoshi'].includes(w.id)) return true;
-            if (w.id === 'ma') return true;
-            return false;
-          });
-        }
-
-        // General endings
-        const isComposto = sequence.some(w => w.category === 'possessive');
-        if (!verbExists && isComposto && last.category !== 'adjective') {
-          return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question'].includes(w.category));
-        }
-
-        // Questions are final, but can have 'ma' if not a question already
-        if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
-          return WORDS.filter(w => w.id === 'ma');
-        }
-
-        return [];
-      }
-
-      return [];
-    };
-
-    const baseWords = getBaseWords();
-    let finalWords = [...baseWords];
-
-    // Leave question particles (like 'ma') available after standard complete sentence is formed
-    if (checkIsValid(sequence)) {
-      const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji'].includes(w.id));
-      const hasMa = sequence.some(w => w.id === 'ma');
-      if (!hasQuestion && !hasMa) {
-        const maWord = WORDS.find(w => w.id === 'ma');
-        if (maWord && !finalWords.some(w => w.id === 'ma')) {
-          finalWords.push(maWord);
-        }
-      }
-    }
-
-    if (sequence.length > 0) {
-      const last = sequence[sequence.length - 1];
-      
-      // Rule for adding 'he_conj' (conjunction "e")
-      const nounCategories = ['suffix', 'noun', 'thing', 'country', 'pronoun', 'family'];
-      const restrictedIds = ['zhe', 'na_dem', 'nan', 'nü', 'dianhua', 'haoma', 'gongzuo'];
-      if (nounCategories.includes(last.category) && !restrictedIds.includes(last.id)) {
-        const heConjWord = WORDS.find(w => w.id === 'he_conj');
-        if (heConjWord && !finalWords.some(w => w.id === 'he_conj')) {
-          finalWords.push(heConjWord);
-        }
-      }
-
-      // Rule for adding 'ye' (também) as a clause connector
-      if (checkIsValid(sequence) && last.category !== 'question' && last.id !== 'xie_xie' && last.id !== 'qing') {
-        const yeWord = WORDS.find(w => w.id === 'ye');
-        if (yeWord && !finalWords.some(w => w.id === 'ye')) {
-          finalWords.push(yeWord);
-        }
-      }
-    }
-
-    return finalWords;
+    return getAvailableWordsForSequence(sequence);
   }, [sequence]);
 
   // Helper to check if sequence forms a complete/valid clause
   const isValidSentence = useMemo(() => {
     return checkIsValid(sequence);
   }, [sequence]);
+
+  // Tokens detected in search query
+  const tokensInQuery = useMemo(() => {
+    return tokenizePhraseInput(searchQuery);
+  }, [searchQuery]);
+
+  const isMultiWordQuery = tokensInQuery.length > 1;
+
+  // "Did you mean" suggestion based on current search input
+  const didYouMean = useMemo(() => {
+    return getDidYouMeanSuggestion(searchQuery, sequence);
+  }, [searchQuery, sequence]);
+
+  // Handle phrase validation and assembly
+  const handleValidateAndBuildPhrase = (inputToValidate?: string) => {
+    const text = inputToValidate !== undefined ? inputToValidate : searchQuery;
+    if (!text.trim()) return;
+
+    const report = validateAndBuildPhrase(text);
+    setValidationReport(report);
+
+    if (report.validWords.length > 0) {
+      setSequence(report.validWords);
+    }
+    
+    if (report.success) {
+      setSearchQuery('');
+    }
+  };
+
+  // Keyboard handler for search input
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isMultiWordQuery) {
+        handleValidateAndBuildPhrase(searchQuery);
+      } else if (filteredWords.length > 0) {
+        addWord(filteredWords[0]);
+      } else if (didYouMean && didYouMean.hasCorrections) {
+        setSearchQuery(didYouMean.suggestedText);
+        handleValidateAndBuildPhrase(didYouMean.suggestedText);
+      } else if (searchQuery.trim()) {
+        handleValidateAndBuildPhrase(searchQuery);
+      }
+    }
+  };
 
   // Check if word is clickable (available to select)
   const isWordClickable = (word: Word) => {
@@ -731,38 +1373,278 @@ export default function App() {
           </div>
           <button 
             onClick={clearSequence}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
             Limpar
           </button>
         </div>
 
-        {/* Prominent Search Bar Section */}
+        {/* Prominent Search & Sentence Input Bar Section */}
         <div className="bg-slate-50 hover:bg-slate-100/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 border-2 border-slate-200/80 rounded-2xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-300">
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-indigo-600" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pesquisar Pinyins Disponíveis</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Search className="w-5 h-5 text-indigo-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Pesquisar Palavra ou Digitar Frase Completa
+              </span>
+            </div>
+            {isMultiWordQuery && (
+              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-indigo-500" />
+                Frase detectada ({tokensInQuery.length} palavras)
+              </span>
+            )}
           </div>
-          <div className="relative">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Digite o pinyin, ideograma (hanzi) ou tradução em português..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-4 pr-10 py-3 text-sm bg-white text-slate-800 rounded-xl border border-slate-200/80 focus:border-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium shadow-inner"
-            />
-            {searchQuery && (
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Ex: wo jia you si kou ren, ni hao, 我喜欢喝茶 ou busque palavras..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full pl-4 pr-10 py-3 text-sm bg-white text-slate-800 rounded-xl border border-slate-200/80 focus:border-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium shadow-inner"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Limpar texto"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {searchQuery.trim() && (
               <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                onClick={() => handleValidateAndBuildPhrase(searchQuery)}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                <Play className="w-3.5 h-3.5 fill-current" />
+                {isMultiWordQuery ? 'Montar e Validar' : 'Validar'}
               </button>
             )}
           </div>
+
+          <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <CornerDownLeft className="w-3.5 h-3.5 text-slate-400" />
+            <span>Pressione <strong>Enter</strong> para validar uma frase completa palavra por palavra ou selecionar termos.</span>
+          </p>
         </div>
+
+        {/* "Você quis dizer..." Suggestion Banner when typos are detected in the search/phrase */}
+        {didYouMean && didYouMean.hasCorrections && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-indigo-50/95 via-sky-50/80 to-blue-50/95 border-2 border-indigo-200/90 rounded-2xl p-4 shadow-sm"
+          >
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="flex flex-wrap items-baseline gap-1.5 text-sm">
+                <span className="text-slate-600 font-medium">Você quis dizer:</span>
+                <button
+                  onClick={() => {
+                    setSearchQuery(didYouMean.suggestedText);
+                    handleValidateAndBuildPhrase(didYouMean.suggestedText);
+                  }}
+                  className="inline-flex items-center gap-1 font-mono text-xs sm:text-sm font-semibold bg-white hover:bg-indigo-50/50 border border-indigo-200/80 px-2.5 py-1 rounded-xl shadow-xs hover:border-indigo-300 transition-all cursor-pointer group text-slate-800"
+                  title="Clique para aplicar a frase sugerida e validar"
+                >
+                  <span className="text-slate-800">
+                    {didYouMean.parts.map((part, idx) => (
+                      <React.Fragment key={idx}>
+                        {idx > 0 && ' '}
+                        {part.isChanged ? (
+                          <strong className="text-indigo-700 font-bold bg-indigo-100/90 px-1.5 py-0.5 rounded uppercase tracking-wider text-xs border border-indigo-200">
+                            {part.text}
+                          </strong>
+                        ) : (
+                          <span>{part.text}</span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </span>
+                  <span className="text-slate-400 font-normal">?</span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setSearchQuery(didYouMean.suggestedText);
+                handleValidateAndBuildPhrase(didYouMean.suggestedText);
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold uppercase tracking-wider shadow-sm transition-all cursor-pointer shrink-0"
+            >
+              <span>Aplicar Sugestão</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+
+        {/* Step-by-Step Sentence Validation Report Card */}
+        {validationReport && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`flex flex-col gap-4 rounded-2xl p-5 border-2 shadow-md transition-all ${
+              validationReport.success
+                ? 'bg-emerald-50/90 border-emerald-300 text-slate-800'
+                : 'bg-rose-50/90 border-rose-300 text-slate-800'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div
+                  className={`p-2.5 rounded-xl shrink-0 ${
+                    validationReport.success
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-rose-100 text-rose-700'
+                  }`}
+                >
+                  {validationReport.success ? (
+                    <CheckCircle2 className="w-6 h-6" />
+                  ) : (
+                    <AlertCircle className="w-6 h-6" />
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Validação Passo a Passo
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        validationReport.success
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-rose-200 text-rose-900'
+                      }`}
+                    >
+                      {validationReport.success
+                        ? `${validationReport.steps.length} / ${validationReport.steps.length} Válidas`
+                        : `Interrompido na Palavra ${validationReport.stoppedAtIndex! + 1}`}
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-bold text-slate-900 mt-1">
+                    {validationReport.success
+                      ? 'Frase montada e validada com sucesso!'
+                      : validationReport.errorReason}
+                  </h3>
+
+                  {!validationReport.success && validationReport.steps[validationReport.stoppedAtIndex!]?.ruleHint && (
+                    <p className="text-xs text-rose-900 font-medium mt-1 leading-relaxed">
+                      {validationReport.steps[validationReport.stoppedAtIndex!].ruleHint}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setValidationReport(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-black/5 transition-colors cursor-pointer"
+                title="Fechar relatório"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Visual Word-by-Word Timeline / Stepper */}
+            <div className="border-t border-black/10 pt-3 flex flex-col gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Progresso Palavra por Palavra:
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {validationReport.steps.map((step, idx) => {
+                  const isSuccess = step.status === 'valid';
+                  const isError = step.status === 'invalid_grammar' || step.status === 'unknown_word';
+                  const isUnprocessed = step.status === 'unprocessed';
+
+                  return (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <div
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${
+                          isSuccess
+                            ? 'bg-emerald-100/90 border-emerald-300 text-emerald-950 shadow-sm'
+                            : isError
+                            ? 'bg-rose-100 border-rose-400 text-rose-950 ring-2 ring-rose-400/50 shadow-sm'
+                            : 'bg-slate-100/80 border-slate-200 text-slate-400 opacity-60'
+                        }`}
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-mono font-bold text-slate-400">#{step.position}</span>
+                            <span className="font-mono font-bold">{step.word ? step.word.label : step.token}</span>
+                          </div>
+                          {step.word && (
+                            <span className="text-sm font-semibold text-slate-900 leading-tight">
+                              {step.word.hanzi}
+                            </span>
+                          )}
+                          {step.word && (
+                            <span className="text-[10px] text-slate-500 truncate leading-none">
+                              {step.word.translation}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="ml-1 shrink-0">
+                          {isSuccess && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                          {isError && <XCircle className="w-4 h-4 text-rose-600" />}
+                          {isUnprocessed && <PauseCircle className="w-4 h-4 text-slate-400" />}
+                        </div>
+                      </div>
+
+                      {idx < validationReport.steps.length - 1 && (
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Context action bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
+              <span className="text-[11px] text-slate-600">
+                {validationReport.success ? (
+                  <span>A frase foi inserida na área ativa abaixo.</span>
+                ) : (
+                  <span>
+                    A validação foi interrompida no erro. {validationReport.validWords.length > 0 ? 'A sequência válida inicial foi mantida.' : ''}
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2">
+                {!validationReport.success && validationReport.suggestion && validationReport.suggestion.hasCorrections && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery(validationReport.suggestion!.suggestedText);
+                      handleValidateAndBuildPhrase(validationReport.suggestion!.suggestedText);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Corrigir e Montar</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setValidationReport(null)}
+                  className="px-3 py-1.5 rounded-lg bg-white/80 hover:bg-white text-slate-700 text-xs font-semibold border border-slate-200 shadow-sm transition-all cursor-pointer"
+                >
+                  Fechar Aviso
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Word Palette Board (Available words right below search bar) */}
         {filteredWords.length > 0 && (
@@ -857,10 +1739,48 @@ export default function App() {
 
         {/* Feedback when searched word does not exist in vocabulary at all */}
         {searchQuery.trim() !== '' && filteredWords.length === 0 && matchingDictionaryWords.length === 0 && (
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 text-center text-slate-500 flex flex-col items-center justify-center gap-1.5">
-            <HelpCircle className="w-6 h-6 text-slate-400 mb-1" />
-            <p className="text-sm font-medium">Nenhuma palavra encontrada para "{searchQuery}"</p>
-            <p className="text-xs text-slate-400">Verifique a ortografia do pinyin, ideograma ou tradução em português.</p>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+            <div className="flex flex-col items-center justify-center gap-1.5">
+              <HelpCircle className="w-6 h-6 text-slate-400 mb-0.5" />
+              <p className="text-sm font-medium text-slate-700">Nenhuma palavra encontrada para "{searchQuery}"</p>
+              <p className="text-xs text-slate-400">Verifique a ortografia do pinyin, ideograma ou tradução em português.</p>
+            </div>
+
+            {didYouMean && didYouMean.suggestedWords.length > 0 && (
+              <div className="w-full border-t border-slate-200/80 pt-3.5 flex flex-col gap-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">
+                  Palavras aproximadas sugeridas:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {didYouMean.suggestedWords.map(word => {
+                    const Icon = word.icon;
+                    const clickable = isWordClickable(word);
+                    return (
+                      <button
+                        key={word.id}
+                        onClick={() => clickable && addWord(word)}
+                        disabled={!clickable}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
+                          clickable
+                            ? `${getCategoryBg(word.category)} border-indigo-200 text-slate-700 hover:scale-[102%] hover:shadow-md active:scale-95 cursor-pointer`
+                            : 'bg-white/70 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                        }`}
+                        title={clickable ? 'Clique para adicionar à frase' : 'Indisponível na posição gramatical atual'}
+                      >
+                        <div className={`p-1.5 rounded-lg ${clickable ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-indigo-600 font-bold leading-none">{word.label}</span>
+                          <span className="font-semibold text-sm truncate mt-0.5 text-slate-900">{word.hanzi}</span>
+                          <span className="text-[10px] text-slate-500 truncate leading-none mt-0.5">{word.translation}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
