@@ -12,7 +12,7 @@ import {
   Droplets, Coffee, CupSoda, Milk, Utensils, Soup,
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
-  ListOrdered, PauseCircle, Award, BookOpen, Coins
+  ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -52,7 +52,9 @@ const WORDS: Word[] = [
   // Pronouns
   { id: 'wo', label: 'wo', hanzi: '我', translation: 'eu', category: 'pronoun', icon: User },
   { id: 'ni', label: 'ni', hanzi: '你', translation: 'você', category: 'pronoun', icon: User },
+  { id: 'nin', label: 'nín', hanzi: '您', translation: 'o senhor / a senhora (você formal)', category: 'pronoun', icon: UserCheck },
   { id: 'ta', label: 'ta', hanzi: '他', translation: 'ele/ela', category: 'pronoun', icon: User },
+  { id: 'dajia', label: 'dàjiā', hanzi: '大家', translation: 'todos / todo mundo', category: 'pronoun', icon: Users },
   { id: 'zhe', label: 'zhe', hanzi: '这', translation: 'este/isto', category: 'pronoun', icon: ArrowRight },
   { id: 'na_dem', label: 'nà', hanzi: '那', translation: 'aquele', category: 'pronoun', icon: ArrowRight },
   
@@ -132,6 +134,7 @@ const WORDS: Word[] = [
 
   // Nouns
   { id: 'hanyu', label: 'Hanyu', hanzi: '汉语', translation: 'mandarim (língua)', category: 'noun', icon: BookOpen },
+  { id: 'zaoshang', label: 'zǎoshang', hanzi: '早上', translation: 'manhã (cedo / bom dia)', category: 'noun', icon: Sun },
   { id: 'mingzi', label: 'ming zi', hanzi: '名字', translation: 'nome', category: 'noun', icon: FileText },
   { id: 'tongxue', label: 'tongxue', hanzi: '同学', translation: 'colega', category: 'noun', icon: GraduationCap },
   { id: 'laoshi', label: 'laoshi', hanzi: '老师', translation: 'professor', category: 'noun', icon: Briefcase },
@@ -160,8 +163,9 @@ const WORDS: Word[] = [
   { id: 'qian', label: 'qián', hanzi: '钱', translation: 'dinheiro (preço)', category: 'thing', icon: Coins },
 
   // Adjectives
+  { id: 'hao', label: 'hǎo', hanzi: '好', translation: 'bom / bem (olá)', category: 'adjective', icon: Smile },
   { id: 'da_adj', label: 'dà', hanzi: '大', translation: 'grande', category: 'adjective', icon: Tag },
-  { id: 'xiao', label: 'xiao', hanzi: 'xiao', translation: 'pequeno', category: 'adjective', icon: Tag },
+  { id: 'xiao', label: 'xiǎo', hanzi: '小', translation: 'pequeno', category: 'adjective', icon: Tag },
   { id: 'gaoxing', label: 'gaoxing', hanzi: '高兴', translation: 'feliz', category: 'adjective', icon: UserCheck },
   { id: 'mang', label: 'mang', hanzi: '忙', translation: 'ocupado', category: 'adjective', icon: Briefcase },
   { id: 'lei', label: 'lei', hanzi: '累', translation: 'cansado', category: 'adjective', icon: Briefcase },
@@ -186,12 +190,19 @@ const WORDS: Word[] = [
   // Etiquette
   { id: 'qing', label: 'qing', hanzi: '请', translation: 'por favor', category: 'etiquette', icon: UserCheck },
   { id: 'xie_xie', label: 'xie xie', hanzi: '谢谢', translation: 'obrigado', category: 'etiquette', icon: UserCheck },
+  { id: 'zaijian', label: 'zài jiàn', hanzi: '再见', translation: 'tchau / até logo', category: 'etiquette', icon: Smile },
 ];
 
 // Map of multi-word / compound pinyins to dictionary ID
 const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'mei': 'mei',
   'hui': 'hui',
+  'zao shang': 'zaoshang',
+  'zaoshang': 'zaoshang',
+  'da jia': 'dajia',
+  'dajia': 'dajia',
+  'zai jian': 'zaijian',
+  'zaijian': 'zaijian',
   'yi dian': 'yidian',
   'yidian': 'yidian',
   'yi dianr': 'yidian',
@@ -247,6 +258,7 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'zhi dao': 'zhidao',
   'zhidao': 'zhidao',
   'zen me yang': 'zenmeyang',
+  'zenme yang': 'zenmeyang',
   'zenmeyang': 'zenmeyang',
   'na li': 'nali',
   'nali': 'nali',
@@ -269,6 +281,75 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'nai nai': 'nainai',
   'nainai': 'nainai',
 };
+
+// Helper for natural/fluent idiomatic translation of Mandarin phrases to Portuguese
+function getNaturalTranslation(seq: Word[]): string {
+  if (seq.length === 0) return '';
+  
+  const key = seq.map(w => {
+    if (w.id === 'zaoshang') return 'zao shang';
+    if (w.id === 'dajia') return 'da jia';
+    if (w.id === 'zaijian') return 'zai jian';
+    if (w.id === 'laoshi') return 'lao shi';
+    if (w.id === 'tongxue') return 'tong xue';
+    if (w.id === 'pengyou') return 'peng you';
+    if (w.id === 'duoshao') return 'duo shao';
+    if (w.id === 'zenmeyang') return 'zen me yang';
+    if (w.id === 'kafei') return 'ka fei';
+    if (w.id === 'xie_xie') return 'xie xie';
+    return w.id;
+  }).join(' ');
+
+  const IDIOMS: Record<string, string> = {
+    'ni hao': 'Olá! / Oi!',
+    'nin hao': 'Olá! (formal / com respeito)',
+    'ni men hao': 'Olá a todos! / Olá a vocês!',
+    'da jia hao': 'Olá a todos!',
+    'zao shang hao': 'Bom dia!',
+    'lao shi hao': 'Olá, professor(a)!',
+    'tong xue hao': 'Olá, colegas/alunos!',
+    'peng you hao': 'Olá, amigo(a)!',
+    'ni hao ma': 'Como vai você? / Tudo bem?',
+    'nin hao ma': 'Como vai o senhor/a senhora?',
+    'ni men hao ma': 'Como vocês estão? / Tudo bem com vocês?',
+    'wo hen hao': 'Eu estou muito bem.',
+    'wo ye hen hao': 'Eu também estou muito bem.',
+    'bu hao': 'Não estou bem / Ruim.',
+    'hao de': 'Certo / Está bem / Ok.',
+    'hao bu hao': 'Que tal? / Está de acordo?',
+    'xie xie': 'Obrigado(a)!',
+    'xie xie ni': 'Obrigado a você!',
+    'xie xie nin': 'Muito obrigado ao senhor/à senhora!',
+    'xie xie da jia': 'Obrigado a todos!',
+    'zai jian': 'Tchau! / Até logo!',
+    'lao shi zai jian': 'Tchau, professor(a)! / Até logo!',
+    'tong xue zai jian': 'Tchau, colegas! / Até logo!',
+    'da jia zai jian': 'Tchau a todos! / Até logo!',
+    'zai jian lao shi': 'Tchau, professor(a)!',
+    'zai jian da jia': 'Tchau a todos!',
+    'qing zuo': 'Por favor, sente-se.',
+    'qing he cha': 'Por favor, tome um chá.',
+    'qing he ka fei': 'Por favor, tome um café.',
+    'qing he shui': 'Por favor, beba água.',
+    'qing jin': 'Por favor, entre.',
+    'qing shuo': 'Por favor, pode falar.',
+    'duo shao qian': 'Quanto custa? / Qual o preço?',
+    'zhe ge duo shao qian': 'Quanto custa este aqui?',
+    'na_dem ge duo shao qian': 'Quanto custa aquele lá?',
+    'ba xi zen me yang': 'Como é o Brasil?',
+    'zhong guo zen me yang': 'Como é a China?',
+    'ka fei zen me yang': 'Como está o café?',
+    'cha zen me yang': 'Como está o chá?',
+    'gong zuo zen me yang': 'Como está o trabalho?',
+    'zhe ge zen me yang': 'Que tal este?',
+  };
+
+  if (IDIOMS[key]) {
+    return IDIOMS[key];
+  }
+
+  return seq.map(w => w.translation).join(' ');
+}
 
 // Helper to check if a sequence of words forms a valid/complete sentence
 function checkIsValid(seq: Word[]): boolean {
@@ -323,8 +404,9 @@ function checkIsValid(seq: Word[]): boolean {
     // 'zuo' (sentar), 'jin' (entrar) are valid intransitive endings!
   }
 
-  // If ending in etiquette like xie xie
-  if (last.id === 'xie_xie') return true;
+  // If ending in etiquette like xie xie, zai jian, or affirmation like hao de
+  if (last.category === 'etiquette' && (last.id === 'xie_xie' || last.id === 'zaijian')) return true;
+  if (last.id === 'de' && seq.length === 2 && seq[0].id === 'hao') return true;
 
   return false;
 }
@@ -333,13 +415,15 @@ function checkIsValid(seq: Word[]): boolean {
 function getAvailableWordsForSequence(sequence: Word[]): Word[] {
   const getBaseWords = (): Word[] => {
     if (sequence.length === 0) {
-      // Can start with pronoun, etiquette, shei, duoshao, family members, things, or nouns
+      // Can start with pronoun, etiquette, shei, duoshao, family members, things, nouns, countries, or hao
       return WORDS.filter(w => 
         w.category === 'pronoun' || 
         w.category === 'etiquette' || 
         w.category === 'family' ||
+        w.category === 'country' ||
         w.id === 'shei' ||
         w.id === 'duoshao' ||
+        w.id === 'hao' ||
         w.category === 'thing' ||
         w.category === 'noun'
       );
@@ -364,7 +448,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => ['zuo', 'he', 'jin', 'shuo', 'keyi'].includes(w.id));
       }
       if (last.id === 'xie_xie') {
-        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family');
+        return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family' || w.id === 'dajia');
+      }
+      if (last.id === 'zaijian') {
+        return WORDS.filter(w => ['laoshi', 'tongxue', 'pengyou', 'dajia'].includes(w.id));
       }
       return [];
     }
@@ -422,6 +509,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           // Can take plural (except for 'zhe' and 'na_dem')
           if (w.category === 'plural' && last.id !== 'zhe' && last.id !== 'na_dem') return true;
           if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
+          if (w.id === 'zenmeyang') return true;
           if (w.category === 'preposition') return true; // ex: wo gei ...
           if (['zhe', 'na_dem'].includes(last.id)) {
             if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun' || w.id === 'duoshao') return true;
@@ -462,6 +550,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       return WORDS.filter(w => {
         if (w.category === 'plural' || w.category === 'possessive') return true;
         if (['adverb', 'verb', 'adjective', 'preposition'].includes(w.category)) return true;
+        if (w.id === 'zenmeyang') return true;
         return false;
       });
     }
@@ -644,27 +733,48 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
     // Case: Country selected
     if (last.category === 'country') {
-      if (last.requiresGuo && activeVerb?.id === 'shi') {
-        return WORDS.filter(w => w.id === 'guo');
-      }
-      
-      return WORDS.filter(w => {
-        if (w.category !== 'suffix') return false;
-        const supportsLanguageSuffix = !['baxi', 'jianada'].includes(last.id);
+      if (verbExists) {
+        if (last.requiresGuo && activeVerb?.id === 'shi') {
+          return WORDS.filter(w => w.id === 'guo' || w.id === 'ren');
+        }
+        
+        return WORDS.filter(w => {
+          if (w.category !== 'suffix') return false;
+          const supportsLanguageSuffix = !['baxi', 'jianada', 'putaoya'].includes(last.id);
 
-        if (activeVerb?.id === 'shuo') {
-          return w.id === 'yu' && supportsLanguageSuffix;
-        }
-        if (activeVerb?.id === 'shi') {
-          return w.id === 'ren';
-        }
-        return true;
-      });
+          if (activeVerb?.id === 'shuo') {
+            return w.id === 'yu' && supportsLanguageSuffix;
+          }
+          if (activeVerb?.id === 'shi') {
+            return w.id === 'ren';
+          }
+          return true;
+        });
+      } else {
+        // Country as subject or topic (e.g. "baxi zenmeyang?", "zhongguo hen da", "baxi ren", "fayu")
+        return WORDS.filter(w => {
+          if (w.id === 'zenmeyang') return true;
+          if (last.requiresGuo && w.id === 'guo') return true;
+          if (w.id === 'ren') return true;
+          const supportsLanguageSuffix = !['baxi', 'jianada', 'putaoya'].includes(last.id);
+          if (w.id === 'yu' && supportsLanguageSuffix) return true;
+          if (['adverb', 'verb', 'adjective', 'possessive'].includes(w.category)) return true;
+          return false;
+        });
+      }
     }
 
     // Case: Guo selected
     if (last.category === 'guo') {
-      return WORDS.filter(w => w.id === 'ren');
+      if (verbExists) {
+        return WORDS.filter(w => w.id === 'ren');
+      } else {
+        return WORDS.filter(w => {
+          if (w.id === 'ren' || w.id === 'zenmeyang') return true;
+          if (['adverb', 'verb', 'adjective', 'possessive'].includes(w.category)) return true;
+          return false;
+        });
+      }
     }
 
     // Case: Suffix, Noun, Thing, Adjective, Number
@@ -706,8 +816,17 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         });
       }
 
+      // Adjective endings
+      if (last.category === 'adjective') {
+        return WORDS.filter(w => {
+          if (w.id === 'ma') return true;
+          if (last.id === 'hao' && (w.id === 'de' || w.id === 'bu')) return true;
+          return false;
+        });
+      }
+
       // General endings
-      if (!verbExists && !hasQuestion && last.category !== 'adjective') {
+      if (!verbExists && !hasQuestion) {
         return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question', 'possessive'].includes(w.category));
       }
 
@@ -1177,6 +1296,76 @@ function tokenizePhraseInput(input: string): string[] {
     }
     if (norm === 'duoshaoqian') {
       tokens.push('duo shao', 'qian');
+      i++;
+      continue;
+    }
+    if (norm === 'nihao') {
+      tokens.push('ni', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'ninhao') {
+      tokens.push('nin', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'nimenhao') {
+      tokens.push('ni', 'men', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'henhao') {
+      tokens.push('hen', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'buhao') {
+      tokens.push('bu', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'haode') {
+      tokens.push('hao', 'de');
+      i++;
+      continue;
+    }
+    if (norm === 'haobuhao') {
+      tokens.push('hao', 'bu', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'nihaoma') {
+      tokens.push('ni', 'hao', 'ma');
+      i++;
+      continue;
+    }
+    if (norm === 'ninhaoma') {
+      tokens.push('nin', 'hao', 'ma');
+      i++;
+      continue;
+    }
+    if (norm === 'zaoshanghao') {
+      tokens.push('zaoshang', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'dajiahao') {
+      tokens.push('dajia', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'zaijian') {
+      tokens.push('zaijian');
+      i++;
+      continue;
+    }
+    if (norm === 'zaoshang') {
+      tokens.push('zaoshang');
+      i++;
+      continue;
+    }
+    if (norm === 'dajia') {
+      tokens.push('dajia');
       i++;
       continue;
     }
@@ -2034,17 +2223,24 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-100 pt-3">
                 <div>
                   <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Pronúncia (Pinyin)</span>
                   <span className="font-mono text-xs text-indigo-600 font-semibold bg-indigo-50/50 px-2 py-1 rounded-lg inline-block">
                     {sequence.map(w => w.label).join(' ')}
                   </span>
                 </div>
+
+                <div>
+                  <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Tradução Natural</span>
+                  <span className="text-xs text-indigo-900 font-semibold bg-white px-2 py-1 rounded-lg border border-indigo-100 inline-block">
+                    {getNaturalTranslation(sequence)}
+                  </span>
+                </div>
                 
                 <div>
                   <span className="font-bold text-slate-400 uppercase tracking-wider text-[9px] block mb-1">Tradução Literal</span>
-                  <span className="text-xs text-slate-600 font-medium italic">
+                  <span className="text-xs text-slate-600 font-medium italic block py-1">
                     {sequence.map(w => w.translation).join(' ')}
                   </span>
                 </div>
@@ -2052,15 +2248,27 @@ export default function App() {
             </div>
 
             <p className="text-[10px] text-slate-400 font-medium italic">
-              * Clique no botão acima para abrir o Google Tradutor em outra aba e visualizar a tradução contextualizada e fluida.
+              * Clique no botão acima para abrir o Google Tradutor em outra aba e ouvir o áudio ou praticar a pronúncia.
             </p>
           </div>
         )}
 
         {/* Grammar Help Panel */}
         <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 text-xs text-slate-500 flex flex-col gap-1.5">
-          <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Dicas Rápidas de Gramática:</span>
+          <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Dicas Rápidas de Gramática & Expressões:</span>
           <ul className="list-disc pl-4 space-y-1">
+            <li><strong className="text-indigo-600">Cumprimentos em Mandarim:</strong>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 mt-1.5 font-sans">
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">nǐ hǎo (你好)</strong>: Olá</div>
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">nǐ hǎo ma? (你好吗？)</strong>: Como vai você?</div>
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">wǒ hěn hǎo (我很好)</strong>: Estou muito bem</div>
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">zǎoshang hǎo (早上好)</strong>: Bom dia</div>
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">dàjiā hǎo (大家好)</strong>: Olá a todos!</div>
+                <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">zài jiàn (再见)</strong>: Tchau / Até logo</div>
+              </div>
+            </li>
+            <li><strong className="text-indigo-600">Saudações e Qualidade ("hao"):</strong> A palavra <strong className="text-indigo-600">hǎo (好)</strong> significa "bom / bem" e forma cumprimentos e respostas como <strong className="font-mono text-[11px] text-indigo-700">nín hǎo (您好)</strong> = olá formal, <strong className="font-mono text-[11px] text-indigo-700">lǎoshī hǎo (老师好)</strong> = olá professor, <strong className="font-mono text-[11px] text-indigo-700">hěn hǎo (很好)</strong> = muito bem, <strong className="font-mono text-[11px] text-indigo-700">bù hǎo (不好)</strong> = não está bem/ruim, <strong className="font-mono text-[11px] text-indigo-700">hǎo de (好的)</strong> = ok/certo, e perguntas como <strong className="font-mono text-[11px] text-indigo-700">hǎo bù hǎo? (好不好？)</strong> = que tal / está de acordo?.</li>
+            <li><strong className="text-indigo-600">Perguntar "Como é / Como está?" ("zenmeyang"):</strong> Use <strong className="text-indigo-600">zěnmeyàng (怎么样)</strong> após um tópico ou sujeito para perguntar sobre a qualidade, estado ou opinião a respeito de países, comidas, bebidas, trabalho ou pessoas (ex: <strong className="font-mono text-[11px] text-indigo-700">baxi zenmeyang?</strong> = como é o Brasil?, <strong className="font-mono text-[11px] text-indigo-700">kafei zenmeyang?</strong> = como está o café?, <strong className="font-mono text-[11px] text-indigo-700">cha zenmeyang?</strong> = como está o chá?, <strong className="font-mono text-[11px] text-indigo-700">gongzuo zenmeyang?</strong> = como está o trabalho?, <strong className="font-mono text-[11px] text-indigo-700">zhe ge zenmeyang?</strong> = que tal este?).</li>
             <li><strong className="text-indigo-600">Perguntar Preço ("duo shao qian"):</strong> Use <strong className="text-indigo-600">duōshao qián (多少钱)</strong> para perguntar o valor ou preço de itens ou demonstrativos (ex: <strong className="font-mono text-[11px] text-indigo-700">zhe ge duo shao qian?</strong> = quanto custa isto?, <strong className="font-mono text-[11px] text-indigo-700">kafei duo shao qian?</strong> = quanto custa o café?, <strong className="font-mono text-[11px] text-indigo-700">duo shao qian?</strong> = quanto custa?).</li>
             <li><strong className="text-indigo-600">Expressão "Um Pouco" ("yidian"):</strong> Use <strong className="text-indigo-600">yìdiǎn (一点)</strong> para expressar pequenas quantidades após verbos de ação ou antes de substantivos e adjetivos (ex: <strong className="font-mono text-[11px] text-indigo-700">wo hui shuo yidian Hanyu</strong> = eu falo um pouco de mandarim, <strong className="font-mono text-[11px] text-indigo-700">he yidian shui</strong> = beber um pouco d'água, <strong className="font-mono text-[11px] text-indigo-700">wo you yidian mang</strong> = estou um pouco ocupado).</li>
             <li><strong className="text-indigo-600">Poder/Capacidade ("keyi" vs "hui"):</strong> Use <strong className="text-indigo-600">keyi (可以)</strong> para <em>permissão, autorização ou possibilidade</em> (ex: <strong className="font-mono text-[11px] text-indigo-700">ni keyi shuo</strong> = você pode falar / tem permissão, <strong className="font-mono text-[11px] text-indigo-700">wo keyi jin ma?</strong> = posso entrar?). Use <strong className="text-indigo-600">hui (会)</strong> para <em>capacidade adquirida ou habilidade aprendida</em> através de estudo/treino (ex: <strong className="font-mono text-[11px] text-indigo-700">wo hui shuo Hanyu</strong> = eu sei/posso falar mandarim, <strong className="font-mono text-[11px] text-indigo-700">ni hui shuo Hanyu ma?</strong> = você sabe falar mandarim?).</li>
