@@ -314,6 +314,12 @@ function getNaturalTranslation(seq: Word[]): string {
     'ni men hao ma': 'Como vocês estão? / Tudo bem com vocês?',
     'wo hen hao': 'Eu estou muito bem.',
     'wo ye hen hao': 'Eu também estou muito bem.',
+    'wo ye xihuan kafei': 'Eu também gosto de café.',
+    'wo ye xihuan cha': 'Eu também gosto de chá.',
+    'wo ye shi laoshi': 'Eu também sou professor(a).',
+    'wo ye shi xuesheng': 'Eu também sou estudante/aluno(a).',
+    'wo ye shi baxi ren': 'Eu também sou brasileiro(a).',
+    'wo ye bu zhidao': 'Eu também não sei.',
     'bu hao': 'Não estou bem / Ruim.',
     'hao de': 'Certo / Está bem / Ok.',
     'hao bu hao': 'Que tal? / Está de acordo?',
@@ -866,14 +872,6 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       const heConjWord = WORDS.find(w => w.id === 'he_conj');
       if (heConjWord && !finalWords.some(w => w.id === 'he_conj')) {
         finalWords.push(heConjWord);
-      }
-    }
-
-    // Rule for adding 'ye' (também) as a clause connector
-    if (checkIsValid(sequence) && last.category !== 'question' && last.id !== 'xie_xie' && last.id !== 'qing') {
-      const yeWord = WORDS.find(w => w.id === 'ye');
-      if (yeWord && !finalWords.some(w => w.id === 'ye')) {
-        finalWords.push(yeWord);
       }
     }
   }
@@ -2267,6 +2265,7 @@ export default function App() {
                 <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200/70"><strong className="text-indigo-700 font-mono text-[11px]">zài jiàn (再见)</strong>: Tchau / Até logo</div>
               </div>
             </li>
+            <li><strong className="text-indigo-600">Posição do "ye" (也 - também):</strong> Em mandarim, <strong className="text-indigo-600">yě (也)</strong> é um advérbio e deve vir <strong>SEMPRE antes do verbo ou adjetivo</strong> (<em className="text-slate-600">Sujeito + 也 + Verbo/Adjetivo + Objeto</em>). Exemplo correto: <strong className="font-mono text-[11px] text-indigo-700">wǒ yě xǐhuan kāfēi (我也喜欢咖啡)</strong> = <em>Eu também gosto de café</em>, ou <strong className="font-mono text-[11px] text-indigo-700">wǒ yě hěn hǎo (我也很好)</strong> = <em>Eu também estou muito bem</em>. <strong>Nunca</strong> coloque <em>ye</em> no final da frase (ao contrário do português "eu gosto de café também" ou do inglês "too").</li>
             <li><strong className="text-indigo-600">Saudações e Qualidade ("hao"):</strong> A palavra <strong className="text-indigo-600">hǎo (好)</strong> significa "bom / bem" e forma cumprimentos e respostas como <strong className="font-mono text-[11px] text-indigo-700">nín hǎo (您好)</strong> = olá formal, <strong className="font-mono text-[11px] text-indigo-700">lǎoshī hǎo (老师好)</strong> = olá professor, <strong className="font-mono text-[11px] text-indigo-700">hěn hǎo (很好)</strong> = muito bem, <strong className="font-mono text-[11px] text-indigo-700">bù hǎo (不好)</strong> = não está bem/ruim, <strong className="font-mono text-[11px] text-indigo-700">hǎo de (好的)</strong> = ok/certo, e perguntas como <strong className="font-mono text-[11px] text-indigo-700">hǎo bù hǎo? (好不好？)</strong> = que tal / está de acordo?.</li>
             <li><strong className="text-indigo-600">Perguntar "Como é / Como está?" ("zenmeyang"):</strong> Use <strong className="text-indigo-600">zěnmeyàng (怎么样)</strong> após um tópico ou sujeito para perguntar sobre a qualidade, estado ou opinião a respeito de países, comidas, bebidas, trabalho ou pessoas (ex: <strong className="font-mono text-[11px] text-indigo-700">baxi zenmeyang?</strong> = como é o Brasil?, <strong className="font-mono text-[11px] text-indigo-700">kafei zenmeyang?</strong> = como está o café?, <strong className="font-mono text-[11px] text-indigo-700">cha zenmeyang?</strong> = como está o chá?, <strong className="font-mono text-[11px] text-indigo-700">gongzuo zenmeyang?</strong> = como está o trabalho?, <strong className="font-mono text-[11px] text-indigo-700">zhe ge zenmeyang?</strong> = que tal este?).</li>
             <li><strong className="text-indigo-600">Perguntar Preço ("duo shao qian"):</strong> Use <strong className="text-indigo-600">duōshao qián (多少钱)</strong> para perguntar o valor ou preço de itens ou demonstrativos (ex: <strong className="font-mono text-[11px] text-indigo-700">zhe ge duo shao qian?</strong> = quanto custa isto?, <strong className="font-mono text-[11px] text-indigo-700">kafei duo shao qian?</strong> = quanto custa o café?, <strong className="font-mono text-[11px] text-indigo-700">duo shao qian?</strong> = quanto custa?).</li>
