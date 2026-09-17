@@ -13,13 +13,17 @@ import {
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
-  Volume2, Compass, Layers, Shuffle
+  Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
 import { DictionaryModal } from './components/DictionaryModal';
 import { PracticeMode } from './components/PracticeMode';
 import { QuizMode } from './components/QuizMode';
+import { DialogueMode } from './components/DialogueMode';
+import { PronunciationMode } from './components/PronunciationMode';
+import { ChatMode } from './components/ChatMode';
+import { HanziCanvasMode } from './components/HanziCanvasMode';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
@@ -505,6 +509,16 @@ function getNaturalTranslation(seq: Word[]): string {
     'wo xiang qu xuexiao kan shu': 'Eu quero ir à escola para ler (livros).',
     'ni weishenme xiang xuexi hanyu': 'Por que você quer estudar chinês/mandarim?',
     'yinwei wo zai zhongguo gongsi': 'Porque estou (trabalhando) numa empresa chinesa.',
+    'wo he cha': 'Eu tomo chá.',
+    'wo xiang he cha': 'Eu quero tomar chá.',
+    'wo bu he cha': 'Eu não tomo chá.',
+    'wo ye he cha': 'Eu também tomo chá.',
+    'wo he kafei': 'Eu tomo café.',
+    'wo xiang he kafei': 'Eu quero tomar café.',
+    'wo bu he kafei': 'Eu não tomo café.',
+    'wo ye he kafei': 'Eu também tomo café.',
+    'wo he shui': 'Eu bebo água.',
+    'wo xiang he shui': 'Eu quero beber água.',
   };
 
   if (IDIOMS[key]) {
@@ -1877,17 +1891,55 @@ function validateAndBuildPhrase(input: string): PhraseValidationReport {
   };
 }
 
+// Function to validate a full sequence of words token by token from scratch
+function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: number | null; errorTip: ContextualGrammarTip | null } {
+  if (seq.length === 0) return { success: true, stoppedAtIndex: null, errorTip: null };
+  const currentSeq: Word[] = [];
+
+  for (let i = 0; i < seq.length; i++) {
+    const word = seq[i];
+    const allowed = getAvailableWordsForSequence(currentSeq);
+    const isAllowed = allowed.some(aw => aw.id === word.id);
+
+    if (isAllowed) {
+      currentSeq.push(word);
+    } else {
+      const tip = generateGrammarOrderTip(currentSeq, word, word.label, i + 1);
+      return {
+        success: false,
+        stoppedAtIndex: i,
+        errorTip: tip,
+      };
+    }
+  }
+
+  return { success: true, stoppedAtIndex: null, errorTip: null };
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'builder' | 'practice' | 'quiz'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'practice' | 'quiz' | 'dialogue' | 'pronunciation' | 'chat' | 'hanzi'>('dialogue');
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [sequence, setSequence] = useState<Word[]>([]);
+  const [insertIndex, setInsertIndex] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [validationReport, setValidationReport] = useState<PhraseValidationReport | null>(null);
   const [activeGrammarTip, setActiveGrammarTip] = useState<ContextualGrammarTip | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Safely constrained active insertion index
+  const activeInsertIndex = useMemo(() => {
+    return Math.min(Math.max(0, insertIndex), sequence.length);
+  }, [insertIndex, sequence.length]);
+
   const addWord = (word: Word) => {
-    setSequence([...sequence, word]);
+    const targetIdx = activeInsertIndex;
+    const newSeq = [
+      ...sequence.slice(0, targetIdx),
+      word,
+      ...sequence.slice(targetIdx)
+    ];
+    setSequence(newSeq);
+    setInsertIndex(targetIdx + 1);
     setSearchQuery('');
     setValidationReport(null);
     setActiveGrammarTip(null);
@@ -1897,21 +1949,45 @@ export default function App() {
       searchInputRef.current?.focus();
     }, 0);
   };
-  const removeLast = () => {
-    setSequence(sequence.slice(0, -1));
-    setValidationReport(null);
-    setActiveGrammarTip(null);
-  };
-  const clearSequence = () => {
-    setSequence([]);
+
+  const removeWordAt = (index: number) => {
+    const newSeq = sequence.filter((_, i) => i !== index);
+    setSequence(newSeq);
+    if (insertIndex > index) {
+      setInsertIndex(Math.max(0, insertIndex - 1));
+    } else if (insertIndex > newSeq.length) {
+      setInsertIndex(newSeq.length);
+    }
     setValidationReport(null);
     setActiveGrammarTip(null);
   };
 
-  // Available words for current sequence state
+  const removeLast = () => {
+    if (sequence.length === 0) return;
+    removeWordAt(sequence.length - 1);
+  };
+
+  const clearSequence = () => {
+    setSequence([]);
+    setInsertIndex(0);
+    setValidationReport(null);
+    setActiveGrammarTip(null);
+  };
+
+  // Available words for current sequence state and active insertion position
   const availableWords = useMemo(() => {
-    return getAvailableWordsForSequence(sequence);
-  }, [sequence]);
+    if (activeInsertIndex === sequence.length) {
+      return getAvailableWordsForSequence(sequence);
+    }
+    return WORDS.filter(word => {
+      const candidate = [
+        ...sequence.slice(0, activeInsertIndex),
+        word,
+        ...sequence.slice(activeInsertIndex)
+      ];
+      return validateWordSequence(candidate).success;
+    });
+  }, [sequence, activeInsertIndex]);
 
   // Helper to check if sequence forms a complete/valid clause
   const isValidSentence = useMemo(() => {
@@ -1940,6 +2016,7 @@ export default function App() {
 
     if (report.validWords.length > 0) {
       setSequence(report.validWords);
+      setInsertIndex(report.validWords.length);
     }
     
     if (report.success) {
@@ -2046,7 +2123,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.9.15
+                  v1.2026.09.17
                 </span>
               </div>
               <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
@@ -2057,49 +2134,114 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Mode Switcher Tabs */}
-            <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center flex-wrap gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+              <button
+                id="tab-dialogue-btn"
+                onClick={() => setActiveTab('dialogue')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'dialogue'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Diálogo</span>
+              </button>
+
+              <button
+                id="tab-pronunciation-btn"
+                onClick={() => setActiveTab('pronunciation')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'pronunciation'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Teste de Pronúncia com reconhecimento de voz e checagem de regras gramaticais"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Pronúncia</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'pronunciation' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  Mic
+                </span>
+              </button>
+
+              <button
+                id="tab-chat-btn"
+                onClick={() => setActiveTab('chat')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'chat'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Bate-papo em tempo real: envie e receba frases construídas"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Bate-papo</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'chat' ? 'bg-indigo-700 text-white' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  Live
+                </span>
+              </button>
+
+              <button
+                id="tab-hanzi-btn"
+                onClick={() => setActiveTab('hanzi')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'hanzi'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Modo Hanzi: desenhe caracteres na grade e pratique a ordem dos traços"
+              >
+                <PenTool className="w-3.5 h-3.5" />
+                <span>Modo Hanzi</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'hanzi' ? 'bg-rose-700 text-white' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  Desenho
+                </span>
+              </button>
+
               <button
                 id="tab-builder-btn"
                 onClick={() => setActiveTab('builder')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'builder'
                     ? 'bg-white text-indigo-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Construtor Livre</span>
+                <span>Construtor</span>
               </button>
 
               <button
                 id="tab-practice-btn"
                 onClick={() => setActiveTab('practice')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'practice'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Target className="w-3.5 h-3.5" />
-                <span>Modo Prática</span>
+                <span>Prática</span>
               </button>
 
               <button
                 id="tab-quiz-btn"
                 onClick={() => setActiveTab('quiz')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'quiz'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Shuffle className="w-3.5 h-3.5" />
-                <span>Modo Quiz</span>
-                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
-                  activeTab === 'quiz' ? 'bg-indigo-700 text-white' : 'bg-amber-100 text-amber-800 border border-amber-200'
-                }`}>
-                  Novo
-                </span>
+                <span>Quiz</span>
               </button>
             </div>
 
@@ -2129,8 +2271,63 @@ export default function App() {
           </div>
         </div>
 
-        {/* View Switch: Quiz Mode, Practice Mode or Builder Mode */}
-        {activeTab === 'quiz' ? (
+        {/* View Switch: Dialogue Mode, Pronunciation Mode, Chat Mode, Hanzi Mode, Quiz Mode, Practice Mode or Builder Mode */}
+        {activeTab === 'dialogue' ? (
+          <DialogueMode
+            allWords={WORDS}
+            getAvailableWords={getAvailableWordsForSequence}
+            checkIsValidSentence={checkIsValid}
+            getNaturalTranslation={getNaturalTranslation}
+            validateAndBuildPhrase={validateAndBuildPhrase}
+            onOpenDictionary={() => setIsDictionaryOpen(true)}
+          />
+        ) : activeTab === 'pronunciation' ? (
+          <PronunciationMode
+            allWords={WORDS}
+            checkIsValidSentence={checkIsValid}
+            getNaturalTranslation={getNaturalTranslation}
+            builderPhrase={sequence.length > 0 ? {
+              hanzi: sequence.map(w => w.hanzi).join(''),
+              pinyin: sequence.map(w => w.label).join(' '),
+              portuguese: getNaturalTranslation(sequence),
+              words: sequence
+            } : undefined}
+            onSendToBuilder={(words) => {
+              setSequence(words);
+              setInsertIndex(words.length);
+              setActiveTab('builder');
+            }}
+            onOpenDictionary={() => setIsDictionaryOpen(true)}
+          />
+        ) : activeTab === 'chat' ? (
+          <ChatMode
+            allWords={WORDS}
+            builderPhrase={sequence.length > 0 ? {
+              hanzi: sequence.map(w => w.hanzi).join(''),
+              pinyin: sequence.map(w => w.label).join(' '),
+              portuguese: getNaturalTranslation(sequence),
+              words: sequence,
+              isValid: isValidSentence
+            } : undefined}
+            onSendToBuilder={(words) => {
+              setSequence(words);
+              setInsertIndex(words.length);
+              setActiveTab('builder');
+            }}
+            onOpenDictionary={() => setIsDictionaryOpen(true)}
+            onNavigateToBuilder={() => setActiveTab('builder')}
+          />
+        ) : activeTab === 'hanzi' ? (
+          <HanziCanvasMode
+            allWords={WORDS}
+            onOpenDictionary={() => setIsDictionaryOpen(true)}
+            onSendToBuilder={(words) => {
+              setSequence(words);
+              setInsertIndex(words.length);
+              setActiveTab('builder');
+            }}
+          />
+        ) : activeTab === 'quiz' ? (
           <QuizMode
             allWords={WORDS}
             validateAndBuildPhrase={validateAndBuildPhrase}
@@ -2428,10 +2625,15 @@ export default function App() {
         {/* Word Palette Board (Available words right below search bar) */}
         {filteredWords.length > 0 && (
           <div className="flex flex-col gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-600 font-semibold">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-slate-600 font-semibold">
                 <PlusSquare className="w-4 h-4 text-indigo-600" />
                 <span className="text-xs font-bold uppercase tracking-wider">Palavras Disponíveis</span>
+                {sequence.length > 0 && activeInsertIndex < sequence.length && (
+                  <span className="text-[11px] bg-indigo-100/80 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
+                    Inserir entre "{sequence[activeInsertIndex - 1]?.label || 'início'}" e "{sequence[activeInsertIndex]?.label || 'fim'}"
+                  </span>
+                )}
               </div>
               {searchQuery && unavailableMatchingWords.length > 0 && (
                 <span className="text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200/70 px-2 py-0.5 rounded-lg">
@@ -2451,11 +2653,21 @@ export default function App() {
                       if (clickable) {
                         addWord(word);
                       } else {
-                        const tip = generateGrammarOrderTip(sequence, word);
-                        setActiveGrammarTip(tip);
+                        const candidate = [
+                          ...sequence.slice(0, activeInsertIndex),
+                          word,
+                          ...sequence.slice(activeInsertIndex)
+                        ];
+                        const res = validateWordSequence(candidate);
+                        if (res.errorTip) {
+                          setActiveGrammarTip(res.errorTip);
+                        } else {
+                          const tip = generateGrammarOrderTip(sequence.slice(0, activeInsertIndex), word);
+                          setActiveGrammarTip(tip);
+                        }
                       }
                     }}
-                    title={clickable ? 'Clique para adicionar à frase' : 'Ordem gramatical inválida: clique para ver a dica de gramática'}
+                    title={clickable ? 'Clique para inserir na frase' : 'Ordem gramatical inválida: clique para ver a dica de gramática'}
                     className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all ${
                       clickable 
                         ? `${getCategoryBg(word.category)} border-slate-200/80 text-slate-700 hover:scale-[102%] hover:shadow-md active:scale-95 cursor-pointer` 
@@ -2506,8 +2718,18 @@ export default function App() {
                       key={word.id}
                       type="button"
                       onClick={() => {
-                        const tip = generateGrammarOrderTip(sequence, word);
-                        setActiveGrammarTip(tip);
+                        const candidate = [
+                          ...sequence.slice(0, activeInsertIndex),
+                          word,
+                          ...sequence.slice(activeInsertIndex)
+                        ];
+                        const res = validateWordSequence(candidate);
+                        if (res.errorTip) {
+                          setActiveGrammarTip(res.errorTip);
+                        } else {
+                          const tip = generateGrammarOrderTip(sequence.slice(0, activeInsertIndex), word);
+                          setActiveGrammarTip(tip);
+                        }
                       }}
                       className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-white/90 hover:bg-amber-100/70 hover:border-amber-300 text-left transition-all cursor-pointer shadow-xs"
                       title="Clique para ver por que esta palavra não pode entrar nesta posição"
@@ -2584,30 +2806,132 @@ export default function App() {
               <p className="text-xs text-slate-400/80 mt-1">A gramática mandarim será validada em tempo real</p>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2.5 items-center">
-              <AnimatePresence mode="popLayout">
-                {sequence.map((word, idx) => {
-                  const Icon = word.icon;
-                  return (
-                    <motion.div
-                      key={`${word.id}-${idx}`}
-                      layout
-                      initial={{ opacity: 0, scale: 0.8, y: 15 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.8, y: -15 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/60 shadow-sm cursor-pointer select-none transition-all ${getCategoryBg(word.category)} hover:scale-105`}
-                      onClick={idx === sequence.length - 1 ? removeLast : undefined}
-                    >
-                      <span className="font-mono text-[10px] text-slate-400 font-semibold">{word.label}</span>
-                      <span className="font-semibold text-sm">{word.hanzi}</span>
-                      {idx === sequence.length - 1 && (
-                        <X className="w-3 h-3 text-slate-400 hover:text-red-500 ml-0.5" />
+            <div className="flex flex-col">
+              {/* Insertion Point Context Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-200/70 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-lg ${activeInsertIndex < sequence.length ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
+                    <CornerDownLeft className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-700">
+                      {activeInsertIndex === sequence.length ? (
+                        <span>Ponto de inserção: <strong>final da frase</strong> (posição {sequence.length + 1})</span>
+                      ) : (
+                        <span className="text-indigo-700 font-bold">
+                          Inserindo na posição {activeInsertIndex + 1}: entre "{sequence[activeInsertIndex - 1]?.label || 'início'}" e "{sequence[activeInsertIndex]?.label || 'fim'}"
+                        </span>
                       )}
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {activeInsertIndex === sequence.length
+                        ? 'Clique nos botões "+" entre as palavras para inserir termos no meio da frase.'
+                        : 'As palavras disponíveis acima foram filtradas para respeitar a gramática neste ponto.'}
+                    </span>
+                  </div>
+                </div>
+
+                {activeInsertIndex < sequence.length && (
+                  <button
+                    type="button"
+                    onClick={() => setInsertIndex(sequence.length)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition-colors cursor-pointer"
+                    title="Mudar ponto de inserção para o final da frase"
+                  >
+                    <span>Ir para o final</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Words Sequence with Interleaved Insertion Slots */}
+              <div className="flex flex-wrap gap-1.5 items-center py-1">
+                <AnimatePresence mode="popLayout">
+                  {/* Insertion Slot 0 (Start) */}
+                  <div key="slot-0" className="flex items-center">
+                    {activeInsertIndex === 0 ? (
+                      <motion.button
+                        type="button"
+                        layout
+                        onClick={() => setInsertIndex(0)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-sm ring-2 ring-indigo-300 transition-all cursor-pointer z-10 shrink-0"
+                        title="Inserindo no início da frase"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Inserir no início</span>
+                      </motion.button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setInsertIndex(0)}
+                        className="group/slot flex items-center justify-center w-5 h-8 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 border border-dashed border-transparent hover:border-indigo-300 transition-all cursor-pointer shrink-0"
+                        title="Clique para inserir no início da frase"
+                      >
+                        <Plus className="w-3.5 h-3.5 opacity-40 group-hover/slot:opacity-100" />
+                      </button>
+                    )}
+                  </div>
+
+                  {sequence.map((word, idx) => {
+                    const isNextActive = activeInsertIndex === idx + 1;
+                    return (
+                      <React.Fragment key={`${word.id}-${idx}`}>
+                        {/* Word Tile */}
+                        <motion.div
+                          layout
+                          initial={{ opacity: 0, scale: 0.8, y: 15 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, y: -15 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-xs cursor-pointer select-none transition-all ${getCategoryBg(word.category)} hover:shadow-md hover:scale-[102%]`}
+                          onClick={() => setInsertIndex(idx + 1)}
+                          title={`Palavra #${idx + 1}: ${word.label} (${word.translation}). Clique para posicionar o cursor após esta palavra.`}
+                        >
+                          <span className="font-mono text-[10px] text-slate-400 font-semibold">{word.label}</span>
+                          <span className="font-semibold text-sm">{word.hanzi}</span>
+                          
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeWordAt(idx);
+                            }}
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-100 transition-colors ml-0.5"
+                            title={`Remover "${word.label}" da frase`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </motion.div>
+
+                        {/* Insertion Slot after word */}
+                        <div key={`slot-${idx + 1}`} className="flex items-center">
+                          {isNextActive ? (
+                            <motion.button
+                              type="button"
+                              layout
+                              onClick={() => setInsertIndex(idx + 1)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-sm ring-2 ring-indigo-300 transition-all cursor-pointer z-10 shrink-0"
+                              title={idx + 1 === sequence.length ? "Inserindo no final da frase" : `Inserindo entre "${word.label}" e "${sequence[idx + 1]?.label}"`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>{idx + 1 === sequence.length ? 'Inserir no final' : 'Inserir aqui'}</span>
+                            </motion.button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setInsertIndex(idx + 1)}
+                              className="group/slot flex items-center justify-center w-5 h-8 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 border border-dashed border-transparent hover:border-indigo-300 transition-all cursor-pointer shrink-0"
+                              title={idx + 1 === sequence.length ? "Clique para inserir no final da frase" : `Clique para inserir entre "${word.label}" e "${sequence[idx + 1]?.label}"`}
+                            >
+                              <Plus className="w-3.5 h-3.5 opacity-40 group-hover/slot:opacity-100" />
+                            </button>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
             </div>
           )}
 
@@ -2711,6 +3035,29 @@ export default function App() {
                     {sequence.map(w => w.translation).join(' ')}
                   </span>
                 </div>
+              </div>
+
+              {/* Quick actions for newly added modes */}
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('pronunciation')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  title="Praticar e testar a pronúncia desta frase no microfone"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Testar no Microfone</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  title="Enviar esta frase no bate-papo da comunidade"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Mandar no Bate-papo</span>
+                </button>
               </div>
             </div>
 
