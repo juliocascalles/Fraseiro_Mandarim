@@ -82,7 +82,8 @@ async function startServer() {
   const PORT = 3000;
   const server = http.createServer(app);
 
-  app.use(express.json());
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
   // WebSocket Server for Real-Time Bate-papo
   const wss = new WebSocketServer({ server, path: "/ws/chat" });
@@ -222,6 +223,111 @@ async function startServer() {
     });
 
     res.json({ success: true, likes: msg.likes });
+  });
+
+  // API Route for Mandarin Audio Speech-to-Text & Pronunciation Analysis with Gemini
+  app.post("/api/transcribe-audio", async (req, res) => {
+    const { audioBase64, mimeType, targetPhrase } = req.body;
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: "Nenhum dado de áudio fornecido" });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ 
+        error: "GEMINI_API_KEY não configurada no servidor. Por favor, forneça a chave de API nas configurações." 
+      });
+    }
+
+    try {
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      // Strip any data:audio/...;base64, prefix if present
+      const cleanBase64 = audioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
+
+      const prompt = `Você é um avaliador de pronúncia e transcritor profissional de Mandarim (Standard Mandarin Chinese / 普通话).
+Ouça atentamente este áudio gravado por um estudante de chinês.
+${targetPhrase ? `A frase alvo que o estudante estava tentando pronunciar é: "${targetPhrase}".` : 'O estudante está falando livremente em mandarim.'}
+
+Tarefas:
+1. Transcreva com fidelidade o que foi falado em caracteres chineses (Hanzi simplificado).
+2. Forneça o pinyin completo com marcações tonais corretas (ex: mā, má, mǎ, mà).
+3. Traduza a fala em português do Brasil de forma natural.
+4. Avalie a precisão da pronúncia (0 a 100), levando em consideração clareza, sandhi tonal e articulação.
+5. Escreva um feedback curto (1 a 2 frases) em português, encorajador e específico sobre os tons ou fonética percebidos.
+
+Retorne EXCLUSIVAMENTE um objeto JSON válido no formato abaixo, sem formatação Markdown e sem blocos de código:
+{
+  "transcript": "caracteres chineses reconhecidos",
+  "pinyin": "pinyin com acentos tonais",
+  "portuguese": "tradução em português",
+  "confidence": 0.95,
+  "accuracyScore": 90,
+  "feedback": "Excelente articulação de nǐ hǎo com o terceiro tom suavizado."
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType || 'audio/webm',
+                  data: cleanBase64
+                }
+              },
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const responseText = response.text?.trim();
+      if (!responseText) {
+        throw new Error("Resposta vazia recebida do modelo de IA");
+      }
+
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(responseText);
+      } catch (jsonErr) {
+        // Fallback cleanup if the model included formatting
+        const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        parsedResult = JSON.parse(cleaned);
+      }
+
+      return res.json({
+        success: true,
+        transcript: parsedResult.transcript || "",
+        pinyin: parsedResult.pinyin || "",
+        portuguese: parsedResult.portuguese || "",
+        accuracyScore: typeof parsedResult.accuracyScore === 'number' ? parsedResult.accuracyScore : 85,
+        confidence: parsedResult.confidence || 0.9,
+        feedback: parsedResult.feedback || "Pronúncia processada com sucesso!"
+      });
+
+    } catch (err: any) {
+      console.error("Erro ao transcrever áudio com Gemini:", err);
+      return res.status(500).json({ 
+        error: "Falha ao processar o áudio com o serviço de reconhecimento.",
+        details: err?.message || String(err)
+      });
+    }
   });
 
   // API Route for Gemini Translation with MyMemory fallback

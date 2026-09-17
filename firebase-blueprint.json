@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Chat Room",
+      "description": "A collaborative chat room identified by a unique code",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Random room code (e.g. ZH8842)" },
+        "name": { "type": "string", "description": "Display name of the room" },
+        "createdBy": { "type": "string", "description": "User identifier of room creator" },
+        "creatorName": { "type": "string", "description": "Display name of room creator" },
+        "createdAt": { "type": "string", "description": "Creation timestamp ISO string" },
+        "lastActivity": { "type": "string", "description": "Last message timestamp ISO string" }
+      },
+      "required": ["code", "name", "createdBy", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A phrase or text message posted in a chat room",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "description": "Reference to room code" },
+        "senderId": { "type": "string", "description": "User ID of sender" },
+        "senderName": { "type": "string", "description": "Name of sender" },
+        "avatar": { "type": "string", "description": "Sender avatar emoji" },
+        "timestamp": { "type": "string", "description": "Time label" },
+        "createdAt": { "type": "string", "description": "Creation timestamp ISO" },
+        "textMessage": { "type": "string", "description": "Optional conversational text message" },
+        "phrase": { "type": "object", "description": "Mandarin phrase details with hanzi, pinyin, and translation" },
+        "likes": { "type": "number", "description": "Count of likes received" }
+      },
+      "required": ["roomId", "senderId", "senderName", "createdAt", "phrase"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of active chat rooms"
+    },
+    "/rooms/{roomId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Subcollection of chat messages belonging to a room"
+    }
+  }
+}

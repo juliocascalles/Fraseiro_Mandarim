@@ -110,97 +110,64 @@ export const PronunciationMode: React.FC<PronunciationModeProps> = ({
   const [selectedTarget, setSelectedTarget] = useState<typeof PRESET_PRACTICE_PHRASES[0] | null>(PRESET_PRACTICE_PHRASES[0]);
   const [isFreeSpeech, setIsFreeSpeech] = useState<boolean>(false);
 
-  // Speech Recognition state
-  const [isListening, setIsListening] = useState<boolean>(false);
+  // Speech / Audio Recording state
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
+  const [audioLevel, setAudioLevel] = useState<number>(0);
   const [transcript, setTranscript] = useState<string>('');
-  const [interimText, setInterimText] = useState<string>('');
+  const [recognizedPinyin, setRecognizedPinyin] = useState<string>('');
+  const [aiFeedback, setAiFeedback] = useState<string>('');
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const [hasSpeechSupport, setHasSpeechSupport] = useState<boolean>(true);
 
   // Evaluation state
   const [evaluation, setEvaluation] = useState<PronunciationEvaluation | null>(null);
 
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<any>(null);
 
-  // Initialize Web Speech API
+  // Clean up media streams and audio context on unmount
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setHasSpeechSupport(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'zh-CN';
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setSpeechError(null);
-        setInterimText('');
-      };
-
-      recognition.onresult = (event: any) => {
-        let currentInterim = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const res = event.results[i];
-          if (res.isFinal) {
-            finalTranscript += res[0].transcript;
-          } else {
-            currentInterim += res[0].transcript;
-          }
-        }
-
-        if (currentInterim) {
-          setInterimText(currentInterim);
-        }
-
-        if (finalTranscript) {
-          setTranscript(finalTranscript);
-          setInterimText('');
-          // Run pronunciation and grammar evaluation
-          runEvaluation(finalTranscript);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition event error:', event.error);
-        setIsListening(false);
-        if (event.error === 'not-allowed') {
-          setSpeechError('Permissão do microfone negada. Permita o acesso ao microfone no navegador.');
-        } else if (event.error === 'no-speech') {
-          setSpeechError('Nenhum áudio detectado. Fale próximo ao microfone.');
-        } else {
-          setSpeechError(`Erro no reconhecimento de voz (${event.error}). Tente novamente.`);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    } catch (e) {
-      console.error('Falha ao inicializar SpeechRecognition:', e);
-      setHasSpeechSupport(false);
-    }
-
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (_) {}
-      }
+      stopAudioCapture();
     };
   }, []);
 
+  const stopAudioCapture = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch (_) {}
+      audioContextRef.current = null;
+    }
+    setAudioLevel(0);
+    setIsRecording(false);
+  };
+
   // Run evaluation
-  const runEvaluation = (text: string) => {
+  const runEvaluation = (text: string, extraAiData?: { pinyin?: string; feedback?: string; score?: number }) => {
     const targetHanzi = isFreeSpeech ? undefined : selectedTarget?.hanzi;
     const targetPinyin = isFreeSpeech ? undefined : selectedTarget?.pinyin;
 
@@ -211,42 +178,231 @@ export const PronunciationMode: React.FC<PronunciationModeProps> = ({
       targetHanzi,
       targetPinyin
     );
+
+    // If Gemini provided an AI accuracy score or feedback, enrich the evaluation
+    if (extraAiData) {
+      if (extraAiData.score && extraAiData.score > 0) {
+        // Blend rule-based score with acoustic AI score
+        result.score = Math.round((result.score * 0.4) + (extraAiData.score * 0.6));
+      }
+      if (extraAiData.feedback) {
+        result.fluencyFeedback = extraAiData.feedback;
+      }
+    }
+
     setEvaluation(result);
   };
 
-  // Toggle microphone
-  const toggleListening = () => {
-    if (isListening) {
-      try {
-        recognitionRef.current?.stop();
-      } catch (_) {}
-      setIsListening(false);
-    } else {
-      setSpeechError(null);
-      setTranscript('');
-      setInterimText('');
-      setEvaluation(null);
+  // Start recording using MediaRecorder and audio analysis
+  const startRecording = async () => {
+    setSpeechError(null);
+    setTranscript('');
+    setRecognizedPinyin('');
+    setAiFeedback('');
+    setEvaluation(null);
+    setRecordingSeconds(0);
 
-      if (!recognitionRef.current) {
-        setSpeechError('Reconhecimento de fala não suportado neste navegador. Use o Chrome ou Edge.');
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setSpeechError('Seu navegador não suporta gravação de áudio via microfone.');
         return;
       }
 
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        } 
+      });
+      streamRef.current = stream;
+
+      // Setup Web Audio API Analyser for visual volume feedback
       try {
-        recognitionRef.current.start();
-      } catch (err: any) {
-        console.error('Erro ao iniciar gravação:', err);
-        try {
-          recognitionRef.current.abort();
-          setTimeout(() => recognitionRef.current?.start(), 100);
-        } catch (_) {
-          setSpeechError('Não foi possível ativar o microfone. Verifique as permissões.');
-        }
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioContextClass();
+        audioContextRef.current = audioCtx;
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const updateLevel = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
+          animationFrameRef.current = requestAnimationFrame(updateLevel);
+        };
+        updateLevel();
+      } catch (audioErr) {
+        console.warn('AudioContext visualization not available:', audioErr);
       }
+
+      // Determine best audio mimeType supported by browser
+      let mimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+        mimeType = 'audio/ogg';
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size < 100) {
+          setSpeechError('Áudio muito curto ou vazio. Fale algo no microfone.');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Send to backend Gemini audio transcriber
+        await handleSendAudioToBackend(audioBlob, mimeType);
+      };
+
+      mediaRecorder.start(250); // Slice chunks every 250ms
+      setIsRecording(true);
+
+      // Start elapsed timer
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => {
+          if (prev >= 15) {
+            // Auto stop after 15 seconds
+            stopRecording();
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err: any) {
+      console.error('Erro ao acessar o microfone:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setSpeechError('Permissão do microfone negada. Permita o acesso ao microfone nas configurações do navegador.');
+      } else if (err.name === 'NotFoundError') {
+        setSpeechError('Nenhum microfone foi detectado no seu dispositivo.');
+      } else {
+        setSpeechError(`Erro ao inicializar gravação: ${err.message || String(err)}`);
+      }
+      stopAudioCapture();
     }
   };
 
-  // Quick test with sample text (useful for demo/fallback)
+  // Stop recording and process
+  const stopRecording = () => {
+    if (!isRecording) return;
+    setIsRecording(false);
+    setIsProcessing(true);
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setAudioLevel(0);
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.error('Erro ao parar MediaRecorder:', err);
+        setIsProcessing(false);
+      }
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  // Convert Blob to Base64 and send to /api/transcribe-audio
+  const handleSendAudioToBackend = async (audioBlob: Blob, mimeType: string) => {
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+
+        try {
+          const targetPhrase = !isFreeSpeech && selectedTarget ? selectedTarget.hanzi : undefined;
+          const res = await fetch('/api/transcribe-audio', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              audioBase64: base64Audio,
+              mimeType,
+              targetPhrase
+            })
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || `Erro do servidor (${res.status})`);
+          }
+
+          const data = await res.json();
+          if (!data.transcript) {
+            setSpeechError('Nenhuma fala em mandarim pôde ser detectada com clareza no áudio. Fale mais alto e próximo ao microfone.');
+            setIsProcessing(false);
+            return;
+          }
+
+          setTranscript(data.transcript);
+          if (data.pinyin) setRecognizedPinyin(data.pinyin);
+          if (data.feedback) setAiFeedback(data.feedback);
+
+          // Run grammar rules & dictionary validation
+          runEvaluation(data.transcript, {
+            pinyin: data.pinyin,
+            feedback: data.feedback,
+            score: data.accuracyScore
+          });
+
+        } catch (postErr: any) {
+          console.error('Erro na requisição /api/transcribe-audio:', postErr);
+          setSpeechError(`Falha ao reconhecer áudio: ${postErr.message || 'Erro de conexão'}`);
+        } finally {
+          setIsProcessing(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setSpeechError('Erro ao converter o áudio gravado.');
+        setIsProcessing(false);
+      };
+
+    } catch (err: any) {
+      console.error('Erro ao processar áudio:', err);
+      setSpeechError(`Erro no áudio: ${err.message}`);
+      setIsProcessing(false);
+    }
+  };
+
+  // Quick test with sample text (useful for demo/instant practice)
   const handleSimulateSpeech = (text: string) => {
     setTranscript(text);
     setSpeechError(null);
@@ -400,60 +556,102 @@ export const PronunciationMode: React.FC<PronunciationModeProps> = ({
           <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center gap-5 relative overflow-hidden">
             {/* Pulsing ring animation when recording */}
             <div className="relative flex items-center justify-center">
-              {isListening && (
+              {isRecording && (
                 <>
                   <motion.div
-                    animate={{ scale: [1, 1.4, 1.8], opacity: [0.6, 0.3, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.8, ease: 'easeOut' }}
+                    animate={{ scale: [1, 1.3, 1.6], opacity: [0.6, 0.3, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5, ease: 'easeOut' }}
                     className="absolute w-24 h-24 rounded-full bg-rose-400"
                   />
                   <motion.div
-                    animate={{ scale: [1, 1.25, 1.5], opacity: [0.8, 0.4, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.8, delay: 0.3, ease: 'easeOut' }}
+                    animate={{ scale: [1, 1.2, 1.4], opacity: [0.8, 0.4, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5, delay: 0.25, ease: 'easeOut' }}
                     className="absolute w-24 h-24 rounded-full bg-rose-500"
                   />
                 </>
               )}
 
-              <button
-                type="button"
-                onClick={toggleListening}
-                className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-md cursor-pointer ${
-                  isListening
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white ring-4 ring-rose-200 scale-105'
-                    : 'bg-gradient-to-tr from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white hover:scale-105'
-                }`}
-                title={isListening ? 'Clique para parar de falar' : 'Clique e fale no microfone'}
-              >
-                {isListening ? (
-                  <>
-                    <Radio className="w-8 h-8 animate-pulse mb-1" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Ouvindo...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-8 h-8 mb-1" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Falar</span>
-                  </>
-                )}
-              </button>
+              {isProcessing ? (
+                <div className="w-24 h-24 rounded-full bg-indigo-50 border-4 border-indigo-200 flex flex-col items-center justify-center shadow-md animate-pulse">
+                  <Sparkles className="w-8 h-8 text-indigo-600 animate-spin" />
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-700 mt-1">Analisando...</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-md cursor-pointer ${
+                    isRecording
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white ring-4 ring-rose-200 scale-105 animate-pulse'
+                      : 'bg-gradient-to-tr from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white hover:scale-105'
+                  }`}
+                  title={isRecording ? 'Clique para concluir a gravação e avaliar' : 'Clique para começar a gravar seu áudio'}
+                >
+                  {isRecording ? (
+                    <>
+                      <Radio className="w-8 h-8 animate-pulse mb-1" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Parar</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-8 h-8 mb-1" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Gravar</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* Audio Waveform Volume Bar during recording */}
+            {isRecording && (
+              <div className="w-full max-w-xs flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5 justify-center h-8">
+                  {[0.4, 0.7, 1.2, 0.9, 1.5, 0.8, 1.3, 0.6, 1.1, 0.5].map((factor, idx) => {
+                    const height = Math.max(6, Math.min(32, Math.round((audioLevel * factor) / 3)));
+                    return (
+                      <motion.div
+                        key={idx}
+                        className="w-1.5 bg-rose-500 rounded-full transition-all duration-75"
+                        style={{ height: `${height}px` }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold text-rose-600">
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+                  <span>Gravando: 00:{recordingSeconds < 10 ? `0${recordingSeconds}` : recordingSeconds} / 00:15</span>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1 max-w-md">
               <span className="text-sm font-bold text-slate-800">
-                {isListening ? 'Escutando em Mandarim (zh-CN)... Fale agora!' : 'Toque no microfone para iniciar o teste'}
+                {isProcessing
+                  ? 'Processando áudio com Inteligência Artificial...'
+                  : isRecording
+                    ? 'Ouvindo sua pronúncia... Clique em "Parar" quando terminar.'
+                    : 'Toque em "Gravar" e fale em Mandarim no microfone'}
               </span>
               <p className="text-xs text-slate-400">
-                Fale com dicção clara, respeitando a pronúncia das sílabas e as variações tonais.
+                O áudio gravado é transcrito e avaliado diretamente pelo modelo de IA em Mandarim e comparado com as regras do app.
               </p>
             </div>
 
-            {/* Live interim caption */}
-            {(isListening || interimText) && (
-              <div className="w-full max-w-lg p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm italic animate-pulse">
-                {interimText || 'Aguardando voz...'}
-              </div>
-            )}
+            {/* Simulated / Quick Test Bar */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 border-t border-slate-100 w-full max-w-lg">
+              <span className="text-[11px] font-bold text-slate-400">Teste Rápido sem Microfone:</span>
+              {selectedTarget && (
+                <button
+                  type="button"
+                  onClick={() => handleSimulateSpeech(selectedTarget.hanzi)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors cursor-pointer"
+                  title="Simular teste com a frase alvo atual"
+                >
+                  <Play className="w-3 h-3 text-rose-600" />
+                  <span>Testar "{selectedTarget.hanzi}"</span>
+                </button>
+              )}
+            </div>
 
             {/* Error banner if mic was blocked or speech api failed */}
             {speechError && (
@@ -462,18 +660,8 @@ export const PronunciationMode: React.FC<PronunciationModeProps> = ({
                 <div className="flex flex-col gap-1">
                   <span className="font-bold">{speechError}</span>
                   <span className="text-[11px] text-amber-800">
-                    Você também pode clicar abaixo em "Simular Fala" para testar a validação do dicionário e regras gramaticais.
+                    Você também pode clicar em "Testar Frase" acima para experimentar a validação gramatical e dicionário imediatamente.
                   </span>
-                  {selectedTarget && (
-                    <button
-                      type="button"
-                      onClick={() => handleSimulateSpeech(selectedTarget.hanzi)}
-                      className="mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 text-white font-bold text-[11px] w-fit cursor-pointer"
-                    >
-                      <Play className="w-3 h-3" />
-                      <span>Simular fala da frase alvo</span>
-                    </button>
-                  )}
                 </div>
               </div>
             )}
@@ -546,13 +734,26 @@ export const PronunciationMode: React.FC<PronunciationModeProps> = ({
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                     Texto Reconhecido no Áudio:
                   </span>
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-                    <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide">
-                      {evaluation.rawTranscript}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">
-                      {evaluation.recognizedWords.length} palavras mapeadas
-                    </span>
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide">
+                        {evaluation.rawTranscript}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {evaluation.recognizedWords.length} palavras mapeadas
+                      </span>
+                    </div>
+                    {recognizedPinyin && (
+                      <span className="text-sm font-semibold text-rose-700 font-mono">
+                        Pinyin reconhecido: {recognizedPinyin}
+                      </span>
+                    )}
+                    {aiFeedback && (
+                      <div className="mt-1 pt-2 border-t border-slate-200/60 flex items-start gap-2 text-xs text-slate-600">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                        <span><strong>Diagnóstico Fonético IA:</strong> {aiFeedback}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

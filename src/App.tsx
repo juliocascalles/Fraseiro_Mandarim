@@ -1917,7 +1917,7 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'builder' | 'practice' | 'quiz' | 'dialogue' | 'pronunciation' | 'chat' | 'hanzi'>('dialogue');
+  const [activeTab, setActiveTab] = useState<'builder' | 'practice' | 'quiz' | 'dialogue' | 'pronunciation' | 'chat' | 'hanzi'>('builder');
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [sequence, setSequence] = useState<Word[]>([]);
   const [insertIndex, setInsertIndex] = useState<number>(0);

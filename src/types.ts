@@ -211,6 +211,17 @@ export interface DialogueScenario {
 }
 
 // Types for Bate-papo (Community Chat)
+export interface ChatRoom {
+  id: string;
+  code: string;
+  name: string;
+  createdBy?: string;
+  creatorName?: string;
+  createdAt: string;
+  lastActivity?: string;
+  description?: string;
+}
+
 export interface ChatPhraseData {
   hanzi: string;
   pinyin: string;
