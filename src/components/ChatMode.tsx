@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   MessageSquare, Send, Users, Volume2, Layers, Heart, 
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, Smile, 
   Plus, ShieldCheck, ArrowRight, CornerDownRight,
   Share2, Check, Copy, Hash, Compass, KeyRound, ExternalLink,
-  Shuffle, LogIn, User, Trash2
+  Shuffle, LogIn, User, Trash2, Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -21,6 +21,7 @@ import {
   getDocs,
   writeBatch
 } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Word, ChatMessage, ChatPhraseData, ChatRoom, PhraseValidationReport } from '../types';
 import { speakMandarin } from '../utils/speech';
@@ -99,14 +100,84 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [isClearingRoom, setIsClearingRoom] = useState<boolean>(false);
 
+  // User identity & rooms created by this client
+  const [currentUserId, setCurrentUserId] = useState<string>(() => {
+    return auth.currentUser?.uid || localStorage.getItem('chat_device_user_id') || '';
+  });
+
+  const [myCreatedRooms, setMyCreatedRooms] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('chat_my_created_rooms');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const getDeviceUserId = (): string => {
+    let id = localStorage.getItem('chat_device_user_id');
+    if (!id) {
+      id = auth.currentUser?.uid || `usr_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+      localStorage.setItem('chat_device_user_id', id);
+    }
+    return id;
+  };
+
+  const registerCreatedRoom = (code: string) => {
+    if (!code || code === 'ZH-GERAL') return;
+    setMyCreatedRooms((prev) => {
+      if (prev.includes(code)) return prev;
+      const updated = [...prev, code];
+      try {
+        localStorage.setItem('chat_my_created_rooms', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Erro ao registrar sala criada no localStorage:', err);
+      }
+      return updated;
+    });
+  };
+
+  // Determina se o usuário atual é o criador da sala ativa (apenas o criador pode limpar)
+  const isRoomCreator = useMemo(() => {
+    if (!currentRoomCode || currentRoomCode === 'ZH-GERAL') {
+      return false; // A sala comunitária pública não pode ser limpa por participantes individuais
+    }
+
+    // 1. Criado localmente neste dispositivo/navegador
+    if (myCreatedRooms.includes(currentRoomCode)) {
+      return true;
+    }
+
+    // 2. ID do Firebase Auth confere com o createdBy do documento da sala
+    const authUid = auth.currentUser?.uid || currentUserId;
+    if (authUid && currentRoom?.createdBy && currentRoom.createdBy === authUid) {
+      return true;
+    }
+
+    // 3. ID do dispositivo persistido confere com createdBy
+    const localUid = localStorage.getItem('chat_device_user_id');
+    if (localUid && currentRoom?.createdBy && currentRoom.createdBy === localUid) {
+      return true;
+    }
+
+    return false;
+  }, [currentRoomCode, currentRoom, myCreatedRooms, currentUserId]);
+
   // Composer State
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize Anonymous Auth on load
+  // Initialize Anonymous Auth on load & track auth state
   useEffect(() => {
     initAnonymousAuth();
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUserId(user.uid);
+        localStorage.setItem('chat_device_user_id', user.uid);
+      }
+    });
+    return () => unsubAuth();
   }, []);
 
   // Save profile to local storage
@@ -156,6 +227,10 @@ export const ChatMode: React.FC<ChatModeProps> = ({
         setCurrentRoom({ id: docSnap.id, ...docSnap.data() } as ChatRoom);
       } else {
         // Automatically provision room document if it's new
+        const creatorId = currentRoomCode === 'ZH-GERAL'
+          ? 'system_community'
+          : (auth.currentUser?.uid || currentUserId || getDeviceUserId());
+
         const initialRoom: ChatRoom = {
           id: currentRoomCode,
           code: currentRoomCode,
@@ -163,14 +238,17 @@ export const ChatMode: React.FC<ChatModeProps> = ({
           description: currentRoomCode === 'ZH-GERAL' 
             ? 'Compartilhamento comunitário de frases em Mandarim.' 
             : 'Sala de conversa por código compartilhado.',
-          createdBy: auth.currentUser?.uid || senderName,
-          creatorName: senderName,
+          createdBy: creatorId,
+          creatorName: currentRoomCode === 'ZH-GERAL' ? 'Comunidade' : senderName,
           createdAt: new Date().toISOString(),
           lastActivity: new Date().toISOString()
         };
 
         setDoc(roomRef, initialRoom)
           .then(() => {
+            if (currentRoomCode !== 'ZH-GERAL') {
+              registerCreatedRoom(currentRoomCode);
+            }
             setCurrentRoom(initialRoom);
           })
           .catch((err) => {
@@ -221,13 +299,14 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     if (isGenerating) return;
     setIsGenerating(true);
     const newCode = generateRandomRoomCode();
+    const creatorId = auth.currentUser?.uid || currentUserId || getDeviceUserId();
 
     const newRoom: ChatRoom = {
       id: newCode,
       code: newCode,
       name: `Sala ${newCode}`,
       description: 'Sala de conversa com código compartilhado.',
-      createdBy: auth.currentUser?.uid || senderName,
+      createdBy: creatorId,
       creatorName: senderName,
       createdAt: new Date().toISOString(),
       lastActivity: new Date().toISOString()
@@ -235,9 +314,10 @@ export const ChatMode: React.FC<ChatModeProps> = ({
 
     try {
       await setDoc(doc(db, 'rooms', newCode), newRoom);
+      registerCreatedRoom(newCode);
       setCurrentRoomCode(newCode);
       setRoomInputText('');
-      setFeedbackNotice(`Nova sala gerada com o código "${newCode}"! Compartilhe este código para conversarem.`);
+      setFeedbackNotice(`Nova sala gerada com o código "${newCode}"! Você é o criador e pode limpá-la quando quiser.`);
       setTimeout(() => setFeedbackNotice(null), 8000);
       fetchRecentRooms();
     } catch (err) {
@@ -264,8 +344,14 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     setRoomInputText('');
   };
 
-  // Limpar todas as mensagens da sala atual no Firestore
+  // Limpar todas as mensagens da sala atual no Firestore (Apenas criador)
   const handleClearRoom = async () => {
+    if (!isRoomCreator) {
+      setFeedbackNotice('Apenas quem criou a sala tem permissão para limpá-la.');
+      setTimeout(() => setFeedbackNotice(null), 4000);
+      setShowClearConfirm(false);
+      return;
+    }
     if (isClearingRoom) return;
     setIsClearingRoom(true);
     try {
@@ -462,17 +548,32 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  id="btn-limpar-sala-topo"
-                  onClick={() => setShowClearConfirm(true)}
-                  disabled={messages.length === 0 || isClearingRoom}
-                  className="ml-1 px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center gap-1 cursor-pointer font-sans disabled:opacity-40 disabled:cursor-not-allowed border border-rose-200/60"
-                  title="Limpar mensagens desta sala"
-                >
-                  <Trash2 className="w-3 h-3 text-rose-600" />
-                  <span className="text-[10px] font-semibold">Limpar sala</span>
-                </button>
+                {/* Indicador de Criador da Sala */}
+                {isRoomCreator ? (
+                  <span className="ml-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 text-[10px] font-sans font-bold flex items-center gap-1 border border-amber-300/80 shadow-2xs">
+                    <Crown className="w-3 h-3 text-amber-600" />
+                    <span>Criador</span>
+                  </span>
+                ) : currentRoom?.creatorName && currentRoomCode !== 'ZH-GERAL' ? (
+                  <span className="ml-1 text-[10px] text-indigo-700/90 font-sans font-medium">
+                    Criada por: <strong className="text-indigo-950">{currentRoom.creatorName}</strong>
+                  </span>
+                ) : null}
+
+                {/* Botão Limpar Sala - EXCLUSIVO DO CRIADOR DA SALA */}
+                {isRoomCreator && (
+                  <button
+                    type="button"
+                    id="btn-limpar-sala-topo"
+                    onClick={() => setShowClearConfirm(true)}
+                    disabled={messages.length === 0 || isClearingRoom}
+                    className="ml-1 px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 transition-all flex items-center gap-1 cursor-pointer font-sans disabled:opacity-40 disabled:cursor-not-allowed border border-rose-200/60"
+                    title="Limpar mensagens desta sala (Apenas criador)"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-600" />
+                    <span className="text-[10px] font-semibold">Limpar sala</span>
+                  </button>
+                )}
               </div>
 
               {copiedCodeSuccess && (
@@ -697,17 +798,20 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  id="btn-limpar-sala-mensagens"
-                  onClick={() => setShowClearConfirm(true)}
-                  disabled={messages.length === 0 || isClearingRoom}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-200"
-                  title="Limpar mensagens desta sala"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Limpar sala</span>
-                </button>
+                {/* Botão Limpar Sala - EXCLUSIVO DO CRIADOR DA SALA */}
+                {isRoomCreator && (
+                  <button
+                    type="button"
+                    id="btn-limpar-sala-mensagens"
+                    onClick={() => setShowClearConfirm(true)}
+                    disabled={messages.length === 0 || isClearingRoom}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-200"
+                    title="Limpar mensagens desta sala (Apenas criador)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Limpar sala</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -720,9 +824,9 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               </div>
             </div>
 
-            {/* Confirmação para Limpar Sala */}
+            {/* Confirmação para Limpar Sala - Visível apenas para o criador */}
             <AnimatePresence>
-              {showClearConfirm && (
+              {showClearConfirm && isRoomCreator && (
                 <motion.div
                   initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                   animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
@@ -735,9 +839,12 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                         <Trash2 className="w-4 h-4 text-rose-600" />
                       </div>
                       <div>
-                        <strong className="block font-semibold">Limpar frases da sala {currentRoomCode}?</strong>
+                        <div className="flex items-center gap-1.5">
+                          <Crown className="w-3.5 h-3.5 text-amber-600" />
+                          <strong className="block font-semibold">Limpar frases da sala {currentRoomCode}?</strong>
+                        </div>
                         <span className="text-[11px] text-rose-700">
-                          Todas as {messages.length} {messages.length === 1 ? 'mensagem será apagada' : 'mensagens serão apagadas'} para todos os participantes desta sala.
+                          Como criador desta sala, você apagará todas as {messages.length} {messages.length === 1 ? 'mensagem' : 'mensagens'} para todos os participantes.
                         </span>
                       </div>
                     </div>
