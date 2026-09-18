@@ -1,6 +1,6 @@
 {
   "name": "Fraseiro Mandarim",
-  "description": "App educativo para construção de frases em mandarim com teste de pronúncia via microfone, bate-papo entre usuários, prática de traçado Hanzi, diálogos interativos e quiz gramatical.",
-  "requestFramePermissions": ["microphone"],
+  "description": "App educativo para construção de frases em mandarim com bate-papo em tempo real via Firebase, prática de traçado Hanzi, quiz gramatical e construtor integrado.",
+  "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

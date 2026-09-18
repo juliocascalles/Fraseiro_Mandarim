@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, Send, Users, Volume2, Layers, Heart, 
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, Smile, 
-  BookOpen, Plus, ShieldCheck, ArrowRight, CornerDownRight,
+  Plus, ShieldCheck, ArrowRight, CornerDownRight,
   Share2, Check, Copy, Hash, Compass, KeyRound, ExternalLink,
-  Shuffle, LogIn
+  Shuffle, LogIn, User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -21,10 +21,11 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Word, ChatMessage, ChatPhraseData, ChatRoom } from '../types';
+import { Word, ChatMessage, ChatPhraseData, ChatRoom, PhraseValidationReport } from '../types';
 import { speakMandarin } from '../utils/speech';
+import { SentenceBuilder } from './SentenceBuilder';
 
-interface ChatModeProps {
+export interface ChatModeProps {
   allWords: Word[];
   builderPhrase?: {
     hanzi: string;
@@ -33,9 +34,14 @@ interface ChatModeProps {
     words: Word[];
     isValid: boolean;
   };
-  onSendToBuilder: (words: Word[]) => void;
-  onOpenDictionary?: () => void;
-  onNavigateToBuilder?: () => void;
+  builderSequence: Word[];
+  setBuilderSequence: (words: Word[]) => void;
+  builderInsertIndex?: number;
+  setBuilderInsertIndex?: (index: number) => void;
+  getAvailableWords: (sequence: Word[]) => Word[];
+  checkIsValidSentence: (sequence: Word[]) => boolean;
+  getNaturalTranslation: (sequence: Word[]) => string;
+  validateAndBuildPhrase: (input: string) => PhraseValidationReport;
 }
 
 const AVATARS = ['🐼', '🐉', '🦩', '🐯', '🦊', '🐰', '🎋', '🏮'];
@@ -53,9 +59,15 @@ const generateRandomRoomCode = (): string => {
 export const ChatMode: React.FC<ChatModeProps> = ({
   allWords,
   builderPhrase,
-  onSendToBuilder,
-  onOpenDictionary,
-  onNavigateToBuilder
+  builderSequence,
+  setBuilderSequence,
+  builderInsertIndex,
+  setBuilderInsertIndex,
+  getAvailableWords,
+  checkIsValidSentence,
+  getNaturalTranslation,
+  validateAndBuildPhrase,
+  onOpenDictionary
 }) => {
   // User Profile
   const [senderName, setSenderName] = useState<string>(() => {
@@ -85,9 +97,6 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
   // Composer State
-  const [accompanyingText, setAccompanyingText] = useState<string>('');
-  const [customInputText, setCustomInputText] = useState<string>('');
-  const [composerMode, setComposerMode] = useState<'from_builder' | 'quick_pick'>('from_builder');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -256,60 +265,65 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   const handleSendMessage = async () => {
     if (isSubmitting) return;
 
-    let phraseData: ChatPhraseData | null = null;
-
-    if (composerMode === 'from_builder' && builderPhrase && builderPhrase.hanzi) {
-      phraseData = {
-        hanzi: builderPhrase.hanzi,
-        pinyin: builderPhrase.pinyin,
-        portuguese: builderPhrase.portuguese,
-        words: builderPhrase.words,
-        isValidGrammar: builderPhrase.isValid,
-        grammarNotes: builderPhrase.isValid 
-          ? 'Frase com estrutura gramatical validada pelo Fraseiro.' 
-          : 'Frase construída livremente.'
-      };
-    } else if (customInputText.trim()) {
-      phraseData = {
-        hanzi: customInputText.trim(),
-        pinyin: '',
-        portuguese: 'Frase compartilhada',
-        isValidGrammar: true,
-        grammarNotes: 'Frase digitada pelo usuário.'
-      };
-    }
-
-    if (!phraseData) {
-      alert('Construa uma frase no Construtor ou digite uma frase para enviar!');
+    if (!builderSequence || builderSequence.length === 0) {
+      setFeedbackNotice('Monte uma frase no construtor acima para poder enviar.');
+      setTimeout(() => setFeedbackNotice(null), 3500);
       return;
     }
+
+    const hanzi = builderSequence.map(w => w.hanzi).join('');
+    const pinyin = builderSequence.map(w => w.label).join(' ');
+    const portuguese = getNaturalTranslation(builderSequence);
+    const isValid = checkIsValidSentence(builderSequence);
+
+    // CRITICAL: Word contains React Component icon (with symbols like Symbol(react.element)).
+    // Serialize to pure primitive objects so Firestore never encounters a Symbol (Fix ID: 3029).
+    const serializedWords = builderSequence.map(w => ({
+      id: String(w.id),
+      label: String(w.label),
+      hanzi: String(w.hanzi),
+      translation: String(w.translation),
+      category: String(w.category)
+    }));
+
+    const phraseData = {
+      hanzi: String(hanzi),
+      pinyin: String(pinyin),
+      portuguese: String(portuguese),
+      wordIds: builderSequence.map(w => String(w.id)),
+      words: serializedWords,
+      isValidGrammar: Boolean(isValid)
+    };
 
     setIsSubmitting(true);
 
     try {
-      const messagePayload = {
-        roomId: currentRoomCode,
-        senderId: auth.currentUser?.uid || `user-${senderName.toLowerCase().replace(/\s+/g, '')}`,
-        senderName,
-        avatar: senderAvatar,
+      const rawPayload = {
+        roomId: String(currentRoomCode),
+        senderId: String(auth.currentUser?.uid || `user-${senderName.toLowerCase().replace(/[^a-z0-9]/g, '')}`),
+        senderName: String(senderName),
+        avatar: String(senderAvatar),
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         createdAt: new Date().toISOString(),
         phrase: phraseData,
-        textMessage: accompanyingText.trim() || undefined,
         likes: 0
       };
 
+      // Strip all functions, symbols, and undefined values before calling addDoc
+      const cleanPayload = JSON.parse(JSON.stringify(rawPayload));
+
       // Add to Firestore collection
-      await addDoc(collection(db, 'rooms', currentRoomCode, 'messages'), messagePayload);
+      await addDoc(collection(db, 'rooms', currentRoomCode, 'messages'), cleanPayload);
 
       // Update room's last activity
       await updateDoc(doc(db, 'rooms', currentRoomCode), {
         lastActivity: new Date().toISOString()
       }).catch(() => {});
 
-      // Reset composer
-      setAccompanyingText('');
-      setCustomInputText('');
+      // Clear builder sequence after sending so user can build next sentence
+      setBuilderSequence([]);
+      if (setBuilderInsertIndex) setBuilderInsertIndex(0);
+
       setTimeout(scrollToBottom, 120);
 
     } catch (err) {
@@ -332,69 +346,45 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     }
   };
 
-  // Import received phrase into builder
+  // Import received phrase into builder directly on this page
   const handleImportToBuilder = (phrase: ChatPhraseData) => {
+    if (phrase.wordIds && phrase.wordIds.length > 0) {
+      const mapped = phrase.wordIds
+        .map(id => allWords.find(w => w.id === id))
+        .filter((w): w is Word => !!w);
+      if (mapped.length > 0) {
+        setBuilderSequence(mapped);
+        if (setBuilderInsertIndex) setBuilderInsertIndex(mapped.length);
+        return;
+      }
+    }
+
     if (phrase.words && phrase.words.length > 0) {
-      onSendToBuilder(phrase.words);
-    } else {
-      const foundWords: Word[] = [];
-      const rem = phrase.hanzi;
-      for (const w of allWords) {
-        if (rem.includes(w.hanzi)) {
-          foundWords.push(w);
-        }
+      const mapped = phrase.words
+        .map(pw => allWords.find(w => w.id === pw.id || w.hanzi === pw.hanzi))
+        .filter((w): w is Word => !!w);
+      if (mapped.length > 0) {
+        setBuilderSequence(mapped);
+        if (setBuilderInsertIndex) setBuilderInsertIndex(mapped.length);
+        return;
       }
-      if (foundWords.length > 0) {
-        onSendToBuilder(foundWords);
-      } else if (onNavigateToBuilder) {
-        onNavigateToBuilder();
+    }
+
+    const foundWords: Word[] = [];
+    const rem = phrase.hanzi;
+    for (const w of allWords) {
+      if (rem.includes(w.hanzi)) {
+        foundWords.push(w);
       }
+    }
+    if (foundWords.length > 0) {
+      setBuilderSequence(foundWords);
+      if (setBuilderInsertIndex) setBuilderInsertIndex(foundWords.length);
     }
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col gap-6">
-      {/* Top Banner & Profile Bar */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-semibold mb-1">
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-xs uppercase tracking-wider font-bold">Bate-papo em Tempo Real (Firebase)</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
-            Salas de Bate-papo & Troca de Frases
-          </h1>
-          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-            Gere uma sala com código aleatório ou digite o código de outra pessoa para entrar e conversar em tempo real via Firebase Firestore!
-          </p>
-        </div>
-
-        {/* User Identity & Live Cloud Indicator */}
-        <div className="flex items-center gap-3 shrink-0 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{senderAvatar}</span>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                {senderName}
-                <button
-                  type="button"
-                  onClick={() => setIsEditingProfile(true)}
-                  className="text-[10px] text-indigo-600 hover:underline cursor-pointer"
-                >
-                  (mudar)
-                </button>
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-emerald-700">
-                  Firebase Firestore Ativo
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-5">
       {/* Room Identification & Controls: 1- Botão "Gerar sala" | 2- Campo de texto + botão "Entrar" */}
       <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col gap-4">
         
@@ -585,49 +575,92 @@ export const ChatMode: React.FC<ChatModeProps> = ({
             </div>
           </div>
 
-          {/* Builder Phrase Quick Status */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col gap-2.5 text-xs">
-            <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-indigo-600" />
-              Sua Frase do Construtor
+          {/* Canto esquerdo inferior: Avatar e Identidade do Usuário (Req 6) */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-indigo-600" />
+              Meu Perfil
             </span>
 
-            {builderPhrase && builderPhrase.hanzi ? (
-              <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 flex flex-col gap-1">
-                <span className="text-base font-bold text-indigo-950">{builderPhrase.hanzi}</span>
-                <span className="font-mono text-indigo-800 font-semibold">{builderPhrase.pinyin}</span>
-                <span className="text-slate-600">{builderPhrase.portuguese}</span>
-                <div className="mt-2 flex items-center gap-1 text-[10px] text-emerald-800 font-bold">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                  Pronta para ser compartilhada na sala!
-                </div>
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100/70 border border-indigo-200 flex items-center justify-center text-2xl shrink-0 shadow-2xs">
+                {senderAvatar}
               </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 text-center">
-                Monte uma frase no Construtor para compartilhar com a sala.
-                {onNavigateToBuilder && (
+
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-bold text-slate-800 truncate">
+                    {senderName}
+                  </span>
                   <button
                     type="button"
-                    onClick={onNavigateToBuilder}
-                    className="mt-2 block w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer"
+                    onClick={() => setIsEditingProfile(true)}
+                    className="text-[10px] font-semibold text-indigo-600 hover:underline cursor-pointer shrink-0"
+                    title="Mudar nome e avatar"
                   >
-                    Ir ao Construtor
+                    (mudar)
                   </button>
-                )}
+                </div>
+
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-[10px] font-semibold text-emerald-700 truncate">
+                    Firebase Ativo
+                  </span>
+                </div>
               </div>
-            )}
+            </div>
           </div>
 
         </div>
 
-        {/* Right 3 Cols: Real-time Message Stream & Composer */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
+        {/* Right 3 Cols: Construtor Integrado ACIMA, Área de Mensagens ABAIXO (Req 2) */}
+        <div className="lg:col-span-3 flex flex-col gap-5">
           
-          {/* Chat Feed Box */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col h-[520px] overflow-hidden">
+          {/* 1. Construtor Integrado (Acima) */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+            <SentenceBuilder
+              allWords={allWords}
+              sequence={builderSequence}
+              setSequence={setBuilderSequence}
+              insertIndex={builderInsertIndex}
+              setInsertIndex={setBuilderInsertIndex}
+              getAvailableWords={getAvailableWords}
+              checkIsValidSentence={checkIsValidSentence}
+              getNaturalTranslation={getNaturalTranslation}
+              validateAndBuildPhrase={validateAndBuildPhrase}
+              onSendMessage={handleSendMessage}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+
+          {/* 2. Área de Mensagens (Abaixo do construtor - Req 2) */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col h-[460px] overflow-hidden">
             
+            {/* Header da Área de Mensagens */}
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  Mensagens da Sala <span className="font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">{currentRoomCode}</span>
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  ({messages.length} {messages.length === 1 ? 'frase' : 'frases'})
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                title="Rolar para as mensagens mais recentes"
+              >
+                Rolar ao final ↓
+              </button>
+            </div>
+
             {/* Messages Scroll Area */}
-            <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-4">
+            <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3.5">
               {isLoadingMessages ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
                   <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
@@ -638,7 +671,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   <MessageSquare className="w-10 h-10 text-slate-300" />
                   <span className="text-sm font-bold text-slate-600">Nenhuma frase nesta sala ainda!</span>
                   <p className="text-xs text-slate-400 max-w-sm">
-                    Compartilhe o código <strong className="font-mono text-indigo-700">{currentRoomCode}</strong> com um colega ou seja o primeiro a postar uma frase em chinês.
+                    Monte uma frase no construtor acima e clique em <strong>"Enviar Frase"</strong> para iniciar a conversa nesta sala.
                   </p>
                 </div>
               ) : (
@@ -648,7 +681,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   return (
                     <div
                       key={msg.id}
-                      className={`flex flex-col gap-1 max-w-[85%] ${isMine ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+                      className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${isMine ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                     >
                       {/* Sender Header */}
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
@@ -658,92 +691,60 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                         <span>{msg.timestamp}</span>
                       </div>
 
-                      {/* Message Card */}
-                      <div className={`p-4 rounded-3xl border shadow-xs flex flex-col gap-2.5 transition-all ${
+                      {/* Balão de Mensagem: apenas a frase enviada, botão de ouvir e botão de curtir (Req 3) */}
+                      <div className={`p-4 rounded-3xl border shadow-2xs flex flex-col gap-2 transition-all ${
                         isMine 
                           ? 'bg-indigo-600 text-white border-indigo-700 rounded-tr-xs' 
                           : 'bg-white text-slate-800 border-slate-200/90 rounded-tl-xs'
                       }`}>
                         
-                        {/* Optional text message comment */}
-                        {msg.textMessage && (
-                          <p className={`text-xs pb-2 border-b ${
-                            isMine ? 'border-indigo-500/60 text-indigo-100' : 'border-slate-100 text-slate-600'
-                          }`}>
-                            {msg.textMessage}
-                          </p>
-                        )}
-
-                        {/* Built Chinese Phrase Block */}
-                        <div className={`p-3 rounded-2xl flex flex-col gap-1 ${
-                          isMine ? 'bg-indigo-700/80 border border-indigo-500' : 'bg-slate-50 border border-slate-200/80'
-                        }`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <span className={`text-xl sm:text-2xl font-bold tracking-wide ${isMine ? 'text-white' : 'text-slate-900'}`}>
-                              {msg.phrase.hanzi}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => speakMandarin(msg.phrase.hanzi)}
-                              className={`p-1.5 rounded-xl transition-all cursor-pointer shrink-0 ${
-                                isMine ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-white hover:bg-slate-100 text-indigo-600 shadow-xs'
-                              }`}
-                              title="Ouvir pronúncia nativa"
-                            >
-                              <Volume2 className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          {msg.phrase.pinyin && (
-                            <span className={`text-xs font-semibold font-mono ${isMine ? 'text-indigo-200' : 'text-indigo-800'}`}>
-                              {msg.phrase.pinyin}
-                            </span>
-                          )}
-
-                          {msg.phrase.portuguese && (
-                            <span className={`text-xs ${isMine ? 'text-indigo-100' : 'text-slate-600'}`}>
-                              {msg.phrase.portuguese}
-                            </span>
-                          )}
-
-                          {/* Grammar validation badge */}
-                          {msg.phrase.isValidGrammar && (
-                            <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-emerald-400">
-                              <ShieldCheck className="w-3 h-3" />
-                              <span>Gramática Validada</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Message Action Footer: Import to Builder & Like */}
-                        <div className="flex items-center justify-between gap-2 pt-1">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleImportToBuilder(msg.phrase)}
-                              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                                isMine 
-                                  ? 'bg-indigo-500 hover:bg-indigo-400 text-white' 
-                                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
-                              }`}
-                              title="Carregar esta frase para praticar no Construtor"
-                            >
-                              <Layers className="w-3 h-3" />
-                              <span>Carregar no Construtor</span>
-                            </button>
-                          </div>
+                        {/* Linha Principal: Hanzi e Botão de Ouvir */}
+                        <div className="flex items-start justify-between gap-3">
+                          <span className={`text-xl sm:text-2xl font-bold tracking-wide select-text ${isMine ? 'text-white' : 'text-slate-900'}`}>
+                            {msg.phrase?.hanzi || ''}
+                          </span>
 
                           <button
                             type="button"
-                            onClick={() => handleLikeMessage(msg.id)}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-semibold transition-all cursor-pointer ${
+                            onClick={() => speakMandarin(msg.phrase?.hanzi || '')}
+                            className={`p-1.5 rounded-xl transition-all cursor-pointer shrink-0 ${
                               isMine 
-                                ? 'text-indigo-200 hover:text-white' 
-                                : 'text-slate-500 hover:text-rose-600'
+                                ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-xs' 
+                                : 'bg-slate-100 hover:bg-indigo-50 text-indigo-600 shadow-2xs'
+                            }`}
+                            title="Ouvir pronúncia da frase"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Pinyin */}
+                        {msg.phrase?.pinyin && (
+                          <span className={`text-xs font-semibold font-mono ${isMine ? 'text-indigo-200' : 'text-indigo-700'}`}>
+                            {msg.phrase.pinyin}
+                          </span>
+                        )}
+
+                        {/* Tradução em Português */}
+                        {msg.phrase?.portuguese && (
+                          <span className={`text-xs font-medium leading-relaxed ${isMine ? 'text-indigo-100' : 'text-slate-600'}`}>
+                            {msg.phrase.portuguese}
+                          </span>
+                        )}
+
+                        {/* Rodapé do Balão: Botão de Curtir */}
+                        <div className="flex items-center justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleLikeMessage(msg.id)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                              isMine 
+                                ? 'bg-indigo-700/60 hover:bg-indigo-700 text-indigo-100 hover:text-white' 
+                                : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200/60'
                             }`}
                             title="Curtir frase"
                           >
-                            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                            <Heart className={`w-3.5 h-3.5 ${msg.likes && msg.likes > 0 ? 'text-rose-500 fill-rose-500' : 'text-slate-400'}`} />
                             <span>{msg.likes || 0}</span>
                           </button>
                         </div>
@@ -754,101 +755,6 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                 })
               )}
               <div ref={messagesEndRef} />
-            </div>
-
-            {/* Accompanying Phrase Composer Footer */}
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-              
-              {/* Phrase source selector */}
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setComposerMode('from_builder')}
-                    className={`px-3 py-1 rounded-xl font-bold cursor-pointer transition-all ${
-                      composerMode === 'from_builder' 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Usar Frase do Construtor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setComposerMode('quick_pick')}
-                    className={`px-3 py-1 rounded-xl font-bold cursor-pointer transition-all ${
-                      composerMode === 'quick_pick' 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Digitar / Montar Rápido
-                  </button>
-                </div>
-
-                {onOpenDictionary && (
-                  <button
-                    type="button"
-                    onClick={onOpenDictionary}
-                    className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Dicionário</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Quick Pick / Type form if chosen */}
-              {composerMode === 'quick_pick' && (
-                <div className="flex flex-col gap-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                  <input
-                    type="text"
-                    value={customInputText}
-                    onChange={(e) => setCustomInputText(e.target.value)}
-                    placeholder="Escreva a frase em Hanzi ou Pinyin (ex: 你好，我是巴西人)..."
-                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs focus:outline-indigo-500 font-medium"
-                  />
-                </div>
-              )}
-
-              {/* Active Phrase Preview to be sent */}
-              {composerMode === 'from_builder' && builderPhrase && builderPhrase.hanzi && (
-                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-xs">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="font-bold text-indigo-900 shrink-0">Frase Pronta:</span>
-                    <span className="truncate font-semibold text-slate-800">{builderPhrase.hanzi}</span>
-                    <span className="text-slate-500 truncate">({builderPhrase.portuguese})</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full shrink-0">
-                    Validada
-                  </span>
-                </div>
-              )}
-
-              {/* Input row */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={accompanyingText}
-                  onChange={(e) => setAccompanyingText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSendMessage();
-                  }}
-                  placeholder="Mensagem ou comentário opcional (ex: O que acharam dessa frase?)..."
-                  className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs focus:outline-indigo-500 font-medium"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleSendMessage}
-                  disabled={isSubmitting}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 shrink-0 disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSubmitting ? 'Enviando...' : 'Enviar Frase'}</span>
-                </button>
-              </div>
-
             </div>
 
           </div>

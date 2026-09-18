@@ -311,17 +311,6 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
             Pratique o traçado dos caracteres chineses na tradicional grade 米字格 (Mǐzìgé). Aprenda a ordem dos traços (笔顺), memorize os radicais e treine tanto com guia de contorno quanto de memória!
           </p>
         </div>
-
-        {onOpenDictionary && (
-          <button
-            type="button"
-            onClick={onOpenDictionary}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shadow-xs shrink-0"
-          >
-            <BookOpen className="w-4 h-4 text-indigo-600" />
-            <span>Consultar Dicionário</span>
-          </button>
-        )}
       </div>
 
       {/* Main Studio Grid */}

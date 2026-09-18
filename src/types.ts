@@ -222,11 +222,21 @@ export interface ChatRoom {
   description?: string;
 }
 
+export interface ChatPhraseWord {
+  id: string;
+  label: string;
+  hanzi: string;
+  translation: string;
+  category: Category;
+  hskLevel?: HskLevel;
+}
+
 export interface ChatPhraseData {
   hanzi: string;
   pinyin: string;
   portuguese: string;
-  words?: Word[];
+  wordIds?: string[];
+  words?: ChatPhraseWord[] | Word[];
   isValidGrammar: boolean;
   grammarNotes?: string;
 }

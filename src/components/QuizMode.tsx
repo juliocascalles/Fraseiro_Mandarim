@@ -781,16 +781,6 @@ export const QuizMode: React.FC<QuizModeProps> = ({
                   ? 'Pressione Enter para continuar para a próxima pergunta'
                   : 'Selecione uma opção para obter validação instantânea'}
               </span>
-
-              {onOpenDictionary && (
-                <button
-                  onClick={onOpenDictionary}
-                  className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 font-semibold transition-colors cursor-pointer"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Consultar Dicionário</span>
-                </button>
-              )}
             </div>
           </motion.div>
         </AnimatePresence>
