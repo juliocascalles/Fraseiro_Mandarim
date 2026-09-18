@@ -682,4 +682,35 @@ export const PRACTICE_CHALLENGES: PracticeChallenge[] = [
     categoryName: 'Causas (为什么/因为)',
     grammarNote: '"yīnwèi" (因为) introduz a justificativa ("porque..."). "zài Zhōngguó gōngsī" expressa o local de atuação.',
   },
+
+  // 11. Alimentação & Hábitos (吃 & 喝)
+  {
+    id: 'eat_1',
+    portuguese: 'Eu quero comer arroz.',
+    contextHint: 'Eu (wǒ) + querer (xiǎng) + comer (chī) + arroz (mǐfàn)',
+    targetPinyinList: [
+      'wo xiang chi mifan',
+    ],
+    targetHanzi: '我想吃米饭。',
+    targetHanziList: ['我想吃米饭'],
+    hskLevel: 'HSK 1',
+    category: 'intentions_feelings',
+    categoryName: 'Intenções (想/在)',
+    grammarNote: 'O verbo modal "xiǎng" (想 - desejar/querer) antecede o verbo principal "chī" (吃 - comer).',
+  },
+  {
+    id: 'eat_2',
+    portuguese: 'Você gosta de comer comida chinesa?',
+    contextHint: 'Você (nǐ) + gostar (xǐhuan) + comer (chī) + comida chinesa (Zhōngguó cài) + pergunta (ma)',
+    targetPinyinList: [
+      'ni xihuan chi zhongguo cai ma',
+      'ni xihuan chi Zhongguo cai ma',
+    ],
+    targetHanzi: '你喜欢吃中国菜吗？',
+    targetHanziList: ['你喜欢吃中国菜吗'],
+    hskLevel: 'HSK 1',
+    category: 'intentions_feelings',
+    categoryName: 'Intenções (想/在)',
+    grammarNote: '"xǐhuan" (喜欢) + "chī" (吃) expressa preferência alimentar. "ma" ao final fecha a pergunta de sim ou não.',
+  },
 ];

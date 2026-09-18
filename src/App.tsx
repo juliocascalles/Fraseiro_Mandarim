@@ -81,6 +81,7 @@ const WORDS: Word[] = [
   { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber/conhecer', category: 'verb', icon: FileText, hskLevel: 'HSK 1' },
   { id: 'zuo', label: 'zuo', hanzi: '坐', translation: 'sentar', category: 'verb', icon: UserCheck, hskLevel: 'HSK 1' },
   { id: 'he', label: 'hé', hanzi: '喝', translation: 'beber', category: 'verb', icon: Coffee, hskLevel: 'HSK 1' },
+  { id: 'chi', label: 'chī', hanzi: '吃', translation: 'comer', category: 'verb', icon: Utensils, hskLevel: 'HSK 1' },
   { id: 'jin', label: 'jin', hanzi: '进', translation: 'entrar', category: 'verb', icon: ArrowRight, hskLevel: 'HSK 2' },
 
   // Family & Home
@@ -206,6 +207,7 @@ const WORDS: Word[] = [
 
 // Map of multi-word / compound pinyins to dictionary ID
 const COMPOUND_PINYIN_MAP: Record<string, string> = {
+  'chi': 'chi',
   'mei': 'mei',
   'hui': 'hui',
   'zao shang': 'zaoshang',
@@ -517,6 +519,31 @@ function getNaturalTranslation(seq: Word[]): string {
     'wo ye he kafei': 'Eu também tomo café.',
     'wo he shui': 'Eu bebo água.',
     'wo xiang he shui': 'Eu quero beber água.',
+    'wo chi mifan': 'Eu como arroz.',
+    'wo xiang chi mifan': 'Eu quero comer arroz.',
+    'wo bu chi mifan': 'Eu não como arroz.',
+    'wo ye chi mifan': 'Eu também como arroz.',
+    'wo chi mianbao': 'Eu como pão.',
+    'wo xiang chi mianbao': 'Eu quero comer pão.',
+    'wo bu chi mianbao': 'Eu não como pão.',
+    'wo ye chi mianbao': 'Eu também como pão.',
+    'wo chi cai': 'Eu como comida / vegetais / pratos.',
+    'wo xiang chi cai': 'Eu quero comer.',
+    'wo bu chi cai': 'Eu não como vegetais / esses pratos.',
+    'wo ye chi cai': 'Eu também como.',
+    'wo chi zhongguo cai': 'Eu como comida chinesa.',
+    'wo xiang chi zhongguo cai': 'Eu quero comer comida chinesa.',
+    'wo xihuan chi zhongguo cai': 'Eu gosto de comer comida chinesa.',
+    'wo xihuan chi mifan': 'Eu gosto de comer arroz.',
+    'wo xihuan chi mianbao': 'Eu gosto de comer pão.',
+    'qing chi': 'Por favor, sirva-se / Coma!',
+    'qing chi ba': 'Por favor, coma! / Bom apetite!',
+    'chi ba': 'Vamos comer! / Pode comer!',
+    'chi ma': 'Você vai comer? / Quer comer?',
+    'ni chi shenme': 'O que você vai comer?',
+    'ta chi shenme': 'O que ele/ela vai comer?',
+    'chi yidian': 'Comer um pouco.',
+    'chi yidian ba': 'Coma um pouco!',
   };
 
   if (IDIOMS[key]) {
@@ -598,7 +625,7 @@ function checkIsValid(seq: Word[]): boolean {
     const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
     const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing'].includes(w.id));
     if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
-    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'xihuan', 'qu_verb'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'qu ba'
+    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'qu ba', 'qing chi'
     if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb'].includes(last.id)) {
       return false;
     }
@@ -672,7 +699,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     // Case: Etiquette selected
     if (last.category === 'etiquette') {
       if (last.id === 'qing') {
-        return WORDS.filter(w => ['zuo', 'he', 'jin', 'shuo', 'keyi', 'qu_verb', 'kan'].includes(w.id));
+        return WORDS.filter(w => ['zuo', 'he', 'chi', 'jin', 'shuo', 'keyi', 'qu_verb', 'kan'].includes(w.id));
       }
       if (last.id === 'xie_xie') {
         return WORDS.filter(w => w.category === 'pronoun' || w.category === 'family' || w.id === 'dajia');
@@ -891,13 +918,13 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
       if (last.id === 'xiang') {
         // 'xiang' (想 - querer, pensar, acreditar, ter saudades):
-        // 1. Querer fazer algo -> seguido de verbo (qu_verb, kan, xuexi, shuo, zuo, he, jin, da_call, fa_verb)
+        // 1. Querer fazer algo -> seguido de verbo (qu_verb, kan, xuexi, shuo, zuo, he, chi, jin, da_call, fa_verb)
         // 2. Sentir saudades / pensar em alguém -> seguido de pronome (ni, wo, ta, ta_female) ou família (mama, etc.)
         // 3. Sentir falta de algo -> seguido de comida/coisas (cai, shu, etc.) ou possessivo (wo mama de cai)
         // 4. Achar/pensar -> seguido de pronome (ni) para oração subordinada (ni shi baxi ren)
         // 5. Pergunta -> zai xiang shenme
         return WORDS.filter(w => {
-          if (['qu_verb', 'kan', 'xuexi', 'shuo', 'zuo', 'he', 'jin', 'da_call', 'fa_verb'].includes(w.id)) return true;
+          if (['qu_verb', 'kan', 'xuexi', 'shuo', 'zuo', 'he', 'chi', 'jin', 'da_call', 'fa_verb'].includes(w.id)) return true;
           if (['pronoun', 'family', 'thing', 'noun'].includes(w.category)) return true;
           if (w.id === 'shenme') return true;
           return false;
@@ -915,6 +942,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       if (last.id === 'xihuan') {
         const subjectPronoun = sequence.find(w => w.category === 'pronoun');
         return WORDS.filter(w => {
+          if (w.id === 'chi' || w.id === 'he') return true;
           if (['thing', 'family'].includes(w.category)) return true;
           if (w.category === 'question') return ['shei', 'shenme'].includes(w.id);
           if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
@@ -940,10 +968,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
       if (last.id === 'zai') {
         // 'zai' (在 - gerúndio 'estar fazendo' OU preposição de lugar 'em'):
-        // 1. Gerúndio: zai + xiang / kan / xuexi / gongzuo / shuo / da_call / he / zuo
+        // 1. Gerúndio: zai + xiang / kan / xuexi / gongzuo / shuo / da_call / he / chi / zuo
         // 2. Lugar: zai + zhongguo / gongsi / xuexiao / daxue / chaoshi / jia / difang / nar / nali / países
         return WORDS.filter(w => {
-          if (['xiang', 'kan', 'xuexi', 'gongzuo', 'shuo', 'da_call', 'he', 'zuo'].includes(w.id)) return true;
+          if (['xiang', 'kan', 'xuexi', 'gongzuo', 'shuo', 'da_call', 'he', 'chi', 'zuo'].includes(w.id)) return true;
           if (['zhongguo', 'gongsi', 'xuexiao', 'daxue', 'chaoshi', 'jia', 'difang', 'nali', 'nar', 'nali_there'].includes(w.id)) return true;
           if (w.category === 'country') return true;
           return false;
@@ -951,13 +979,13 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'keyi') {
-        // 'keyi' (可以 - poder / permissão): seguido de ações (shuo, zuo, he, jin, da_call, fa_verb, qu_verb, kan) ou preposição gei
-        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'jin', 'da_call', 'fa_verb', 'qu_verb', 'kan'].includes(w.id) || w.id === 'gei');
+        // 'keyi' (可以 - poder / permissão): seguido de ações (shuo, zuo, he, chi, jin, da_call, fa_verb, qu_verb, kan) ou preposição gei
+        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'chi', 'jin', 'da_call', 'fa_verb', 'qu_verb', 'kan'].includes(w.id) || w.id === 'gei');
       }
 
       if (last.id === 'hui') {
-        // 'hui' (会 - poder / saber como habilidade adquirida): seguido de ações (shuo, zuo, he, da_call, fa_verb, jin, kan)
-        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'da_call', 'fa_verb', 'jin', 'kan'].includes(w.id));
+        // 'hui' (会 - poder / saber como habilidade adquirida): seguido de ações (shuo, zuo, he, chi, da_call, fa_verb, jin, kan)
+        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'chi', 'da_call', 'fa_verb', 'jin', 'kan'].includes(w.id));
       }
 
       if (last.id === 'da_call') {
@@ -973,7 +1001,14 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'he') {
-        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang', 'yidian'].includes(w.id));
+        return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang', 'yidian', 'shenme', 'ma', 'ba_part'].includes(w.id));
+      }
+
+      if (last.id === 'chi') {
+        return WORDS.filter(w => [
+          'mifan', 'mianbao', 'cai', 'tang', 'yidian', 'zhongguo',
+          'shenme', 'duoshao', 'ma', 'ba_part'
+        ].includes(w.id) || w.category === 'thing');
       }
 
       // Default verb output (e.g. 'shi'): can follow with nouns, classifiers, countries, pronouns, family, questions, things, numbers, duoda
@@ -1115,7 +1150,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         // Destination followed by particle, question, or purpose action (e.g. qu xuexiao kan shu)
         return WORDS.filter(w => {
           if (['ba_part', 'ma', 'de', 'zenmeyang', 'he_conj'].includes(w.id)) return true;
-          if (['kan', 'xuexi', 'shuo', 'zuo', 'he', 'you_verb', 'dagai'].includes(w.id)) return true;
+          if (['kan', 'xuexi', 'shuo', 'zuo', 'he', 'chi', 'you_verb', 'dagai'].includes(w.id)) return true;
           if (w.category === 'adverb') return true;
           return false;
         });
