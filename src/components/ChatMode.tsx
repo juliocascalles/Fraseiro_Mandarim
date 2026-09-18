@@ -4,7 +4,7 @@ import {
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, Smile, 
   Plus, ShieldCheck, ArrowRight, CornerDownRight,
   Share2, Check, Copy, Hash, Compass, KeyRound, ExternalLink,
-  Shuffle, LogIn, User
+  Shuffle, LogIn, User, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -18,7 +18,8 @@ import {
   limit, 
   updateDoc, 
   increment,
-  getDocs
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Word, ChatMessage, ChatPhraseData, ChatRoom, PhraseValidationReport } from '../types';
@@ -95,6 +96,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(true);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+  const [isClearingRoom, setIsClearingRoom] = useState<boolean>(false);
 
   // Composer State
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -261,6 +264,38 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     setRoomInputText('');
   };
 
+  // Limpar todas as mensagens da sala atual no Firestore
+  const handleClearRoom = async () => {
+    if (isClearingRoom) return;
+    setIsClearingRoom(true);
+    try {
+      const messagesRef = collection(db, 'rooms', currentRoomCode, 'messages');
+      const snap = await getDocs(messagesRef);
+      if (snap.empty) {
+        setFeedbackNotice(`A sala "${currentRoomCode}" já não possui mensagens.`);
+        setTimeout(() => setFeedbackNotice(null), 3000);
+        setShowClearConfirm(false);
+        setIsClearingRoom(false);
+        return;
+      }
+
+      const batch = writeBatch(db);
+      snap.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+      await batch.commit();
+
+      setShowClearConfirm(false);
+      setFeedbackNotice(`A sala "${currentRoomCode}" foi limpa com sucesso (${snap.size} ${snap.size === 1 ? 'mensagem apagada' : 'mensagens apagadas'}).`);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+    } catch (err) {
+      const errInfo = handleFirestoreError(err, OperationType.DELETE, `rooms/${currentRoomCode}/messages`);
+      setFirestoreError(`Erro ao limpar sala: ${errInfo.error}`);
+    } finally {
+      setIsClearingRoom(false);
+    }
+  };
+
   // Send a phrase message to Firebase Firestore
   const handleSendMessage = async () => {
     if (isSubmitting) return;
@@ -425,6 +460,18 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                       <span className="text-[10px]">Copiar</span>
                     </>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-limpar-sala-topo"
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={messages.length === 0 || isClearingRoom}
+                  className="ml-1 px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center gap-1 cursor-pointer font-sans disabled:opacity-40 disabled:cursor-not-allowed border border-rose-200/60"
+                  title="Limpar mensagens desta sala"
+                >
+                  <Trash2 className="w-3 h-3 text-rose-600" />
+                  <span className="text-[10px] font-semibold">Limpar sala</span>
                 </button>
               </div>
 
@@ -649,15 +696,84 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={scrollToBottom}
-                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-                title="Rolar para as mensagens mais recentes"
-              >
-                Rolar ao final ↓
-              </button>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  id="btn-limpar-sala-mensagens"
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={messages.length === 0 || isClearingRoom}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-200"
+                  title="Limpar mensagens desta sala"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar sala</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                  title="Rolar para as mensagens mais recentes"
+                >
+                  Rolar ao final ↓
+                </button>
+              </div>
             </div>
+
+            {/* Confirmação para Limpar Sala */}
+            <AnimatePresence>
+              {showClearConfirm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="overflow-hidden shrink-0"
+                >
+                  <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-900 text-xs shadow-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                        <Trash2 className="w-4 h-4 text-rose-600" />
+                      </div>
+                      <div>
+                        <strong className="block font-semibold">Limpar frases da sala {currentRoomCode}?</strong>
+                        <span className="text-[11px] text-rose-700">
+                          Todas as {messages.length} {messages.length === 1 ? 'mensagem será apagada' : 'mensagens serão apagadas'} para todos os participantes desta sala.
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setShowClearConfirm(false)}
+                        disabled={isClearingRoom}
+                        className="px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-100 text-rose-700 font-medium text-xs cursor-pointer transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        id="btn-confirmar-limpeza"
+                        onClick={handleClearRoom}
+                        disabled={isClearingRoom}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-xs cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
+                      >
+                        {isClearingRoom ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Limpando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Confirmar limpeza</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Messages Scroll Area */}
             <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3.5">

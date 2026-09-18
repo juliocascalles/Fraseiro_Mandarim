@@ -520,6 +520,16 @@ function getNaturalTranslation(seq: Word[]): string {
     'wo he shui': 'Eu bebo água.',
     'wo xiang he shui': 'Eu quero beber água.',
     'wo chi mifan': 'Eu como arroz.',
+    'wo xiang chi': 'Eu quero comer.',
+    'wo xiang he': 'Eu quero beber.',
+    'wo xiang kan': 'Eu quero ver / ler.',
+    'wo xiang xuexi': 'Eu quero estudar / aprender.',
+    'wo xiang shuo': 'Eu quero falar.',
+    'wo xiang zuo': 'Eu quero sentar.',
+    'wo xiang jin': 'Eu quero entrar.',
+    'wo xiang zhidao': 'Eu quero saber.',
+    'wo xiang qu': 'Eu quero ir.',
+    'wo xiang da dianhua': 'Eu quero telefonar / ligar.',
     'wo xiang chi mifan': 'Eu quero comer arroz.',
     'wo bu chi mifan': 'Eu não como arroz.',
     'wo ye chi mifan': 'Eu também como arroz.',
@@ -620,13 +630,13 @@ function checkIsValid(seq: Word[]): boolean {
     return verbExists;
   }
 
-  // If it's a verb, but NOT transitive verbs requiring objects (unless negated or preceded by auxiliary verbs keyi/hui/qing in short dialogue)
+  // If it's a verb, but NOT transitive verbs requiring objects (unless negated or preceded by auxiliary verbs keyi/hui/qing/xiang in short dialogue)
   if (last.category === 'verb') {
     const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
-    const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing'].includes(w.id));
+    const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing', 'xiang'].includes(w.id));
     if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
-    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'qu ba', 'qing chi'
-    if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb'].includes(last.id)) {
+    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb', 'kan', 'xuexi', 'zuo', 'jin', 'da_call', 'fa_verb', 'zhidao'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'wo xiang chi', 'wo xiang qu', 'wo xiang kan'
+    if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb', 'xiang'].includes(last.id)) {
       return false;
     }
     return true;
@@ -918,13 +928,13 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
       if (last.id === 'xiang') {
         // 'xiang' (想 - querer, pensar, acreditar, ter saudades):
-        // 1. Querer fazer algo -> seguido de verbo (qu_verb, kan, xuexi, shuo, zuo, he, chi, jin, da_call, fa_verb)
+        // 1. Querer fazer algo -> seguido de qualquer verbo (verb)
         // 2. Sentir saudades / pensar em alguém -> seguido de pronome (ni, wo, ta, ta_female) ou família (mama, etc.)
         // 3. Sentir falta de algo -> seguido de comida/coisas (cai, shu, etc.) ou possessivo (wo mama de cai)
         // 4. Achar/pensar -> seguido de pronome (ni) para oração subordinada (ni shi baxi ren)
         // 5. Pergunta -> zai xiang shenme
         return WORDS.filter(w => {
-          if (['qu_verb', 'kan', 'xuexi', 'shuo', 'zuo', 'he', 'chi', 'jin', 'da_call', 'fa_verb'].includes(w.id)) return true;
+          if (w.category === 'verb') return true;
           if (['pronoun', 'family', 'thing', 'noun'].includes(w.category)) return true;
           if (w.id === 'shenme') return true;
           return false;

@@ -17,7 +17,7 @@ service cloud.firestore {
                       && request.resource.data.phrase.hanzi is string
                       && request.resource.data.senderName is string;
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
-        allow delete: if false;
+        allow delete: if true;
       }
     }
   }
