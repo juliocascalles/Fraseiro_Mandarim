@@ -19,7 +19,8 @@ import {
   updateDoc, 
   increment,
   getDocs,
-  writeBatch
+  writeBatch,
+  deleteDoc
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -99,6 +100,9 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [isClearingRoom, setIsClearingRoom] = useState<boolean>(false);
+  const [emptyRoomCodes, setEmptyRoomCodes] = useState<Set<string>>(new Set());
+  const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
+  const [isDeletingRoom, setIsDeletingRoom] = useState<boolean>(false);
 
   // User identity & rooms created by this client
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
@@ -274,6 +278,25 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       });
       setMessages(loadedMessages);
       setIsLoadingMessages(false);
+
+      // Rastreia se a sala atual está vazia para habilitar exclusão
+      if (currentRoomCode !== 'ZH-GERAL') {
+        if (loadedMessages.length === 0) {
+          setEmptyRoomCodes((prev) => {
+            const next = new Set(prev);
+            next.add(currentRoomCode);
+            return next;
+          });
+        } else {
+          setEmptyRoomCodes((prev) => {
+            if (!prev.has(currentRoomCode)) return prev;
+            const next = new Set(prev);
+            next.delete(currentRoomCode);
+            return next;
+          });
+        }
+      }
+
       setTimeout(scrollToBottom, 100);
     }, (err) => {
       const errInfo = handleFirestoreError(err, OperationType.LIST, `rooms/${currentRoomCode}/messages`);
@@ -371,14 +394,77 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       });
       await batch.commit();
 
+      if (currentRoomCode !== 'ZH-GERAL') {
+        setEmptyRoomCodes((prev) => new Set(prev).add(currentRoomCode));
+      }
+
       setShowClearConfirm(false);
-      setFeedbackNotice(`A sala "${currentRoomCode}" foi limpa com sucesso (${snap.size} ${snap.size === 1 ? 'mensagem apagada' : 'mensagens apagadas'}).`);
-      setTimeout(() => setFeedbackNotice(null), 4000);
+      setFeedbackNotice(`A sala "${currentRoomCode}" foi limpa com sucesso (${snap.size} ${snap.size === 1 ? 'mensagem apagada' : 'mensagens apagadas'}). Como está vazia, agora ela pode ser excluída na barra lateral.`);
+      setTimeout(() => setFeedbackNotice(null), 5000);
     } catch (err) {
       const errInfo = handleFirestoreError(err, OperationType.DELETE, `rooms/${currentRoomCode}/messages`);
       setFirestoreError(`Erro ao limpar sala: ${errInfo.error}`);
     } finally {
       setIsClearingRoom(false);
+    }
+  };
+
+  // Excluir sala vazia do Firebase
+  const handleDeleteRoom = async (roomCodeToDelete: string) => {
+    if (isDeletingRoom) return;
+    if (!roomCodeToDelete || roomCodeToDelete === 'ZH-GERAL') {
+      setFeedbackNotice('A sala comunitária aberta ZH-GERAL é padrão e não pode ser excluída.');
+      setTimeout(() => setFeedbackNotice(null), 3500);
+      setRoomToDelete(null);
+      return;
+    }
+
+    setIsDeletingRoom(true);
+    try {
+      // 1. Limpar mensagens remanescentes da subcoleção, se houver
+      const messagesRef = collection(db, 'rooms', roomCodeToDelete, 'messages');
+      const snap = await getDocs(messagesRef);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.docs.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+
+      // 2. Apagar o documento da sala no Firestore
+      await deleteDoc(doc(db, 'rooms', roomCodeToDelete));
+
+      // 3. Atualizar estados locais
+      setRecentRooms((prev) => prev.filter((r) => r.code !== roomCodeToDelete));
+      setEmptyRoomCodes((prev) => {
+        const next = new Set(prev);
+        next.delete(roomCodeToDelete);
+        return next;
+      });
+
+      setMyCreatedRooms((prev) => {
+        const next = prev.filter((c) => c !== roomCodeToDelete);
+        try {
+          localStorage.setItem('chat_my_created_rooms', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 4. Se a sala excluída for a sala em que o usuário está, retornar para ZH-GERAL
+      if (currentRoomCode === roomCodeToDelete) {
+        setCurrentRoomCode('ZH-GERAL');
+      }
+
+      setRoomToDelete(null);
+      setFeedbackNotice(`A sala vazia "${roomCodeToDelete}" foi excluída do bate-papo com sucesso.`);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+      fetchRecentRooms();
+    } catch (err) {
+      const errInfo = handleFirestoreError(err, OperationType.DELETE, `rooms/${roomCodeToDelete}`);
+      setFirestoreError(`Erro ao excluir sala: ${errInfo.error}`);
+    } finally {
+      setIsDeletingRoom(false);
     }
   };
 
@@ -698,28 +784,63 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               {/* Other recent active rooms */}
               {recentRooms
                 .filter((r) => r.code !== 'ZH-GERAL')
-                .map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setCurrentRoomCode(r.code)}
-                    className={`flex flex-col text-left p-3 rounded-2xl transition-all cursor-pointer border ${
-                      currentRoomCode === r.code
-                        ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 shadow-xs ring-1 ring-indigo-300'
-                        : 'border-slate-100 bg-slate-50/50 hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold truncate max-w-[120px]">{r.name}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 font-bold">
-                        {r.code}
-                      </span>
+                .map((r) => {
+                  const isThisRoomEmpty =
+                    (r.code === currentRoomCode && messages.length === 0 && !isLoadingMessages) ||
+                    emptyRoomCodes.has(r.code);
+
+                  return (
+                    <div
+                      key={r.id}
+                      onClick={() => setCurrentRoomCode(r.code)}
+                      className={`group flex flex-col text-left p-3 rounded-2xl transition-all cursor-pointer border ${
+                        currentRoomCode === r.code
+                          ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 shadow-xs ring-1 ring-indigo-300'
+                          : 'border-slate-100 bg-slate-50/50 hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-bold truncate max-w-[110px]">{r.name}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 font-bold">
+                            {r.code}
+                          </span>
+
+                          {/* Botão de lixeira na sala correspondente quando vazia */}
+                          {isThisRoomEmpty && (
+                            <button
+                              type="button"
+                              id={`btn-excluir-sala-${r.code}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRoomToDelete(r.code);
+                              }}
+                              className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 transition-all cursor-pointer shadow-2xs active:scale-90"
+                              title="Salas vazias podem ser excluídas do bate-papo. Clique para excluir esta sala."
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {r.description && (
+                        <span className="text-[11px] text-slate-500 mt-0.5 truncate">{r.description}</span>
+                      )}
+
+                      {/* Indicador de sala vazia quando detectada */}
+                      {isThisRoomEmpty && (
+                        <div className="flex items-center justify-between mt-1 text-[10px] text-rose-600 font-medium">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            Sala vazia
+                          </span>
+                          <span className="text-[9px] text-rose-500 underline font-semibold">Excluir</span>
+                        </div>
+                      )}
                     </div>
-                    {r.description && (
-                      <span className="text-[11px] text-slate-500 mt-0.5 truncate">{r.description}</span>
-                    )}
-                  </button>
-                ))}
+                  );
+                })}
             </div>
           </div>
 
@@ -896,6 +1017,12 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   <p className="text-xs text-slate-400 max-w-sm">
                     Monte uma frase no construtor acima e clique em <strong>"Enviar Frase"</strong> para iniciar a conversa nesta sala.
                   </p>
+                  {currentRoomCode !== 'ZH-GERAL' && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-[11px]">
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>Salas vazias podem ser excluídas pelo botão de lixeira na barra lateral de <strong>"Salas ativas"</strong>.</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 messages.map((msg) => {
@@ -1040,6 +1167,62 @@ export const ChatMode: React.FC<ChatModeProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de confirmação para excluir sala vazia */}
+      <AnimatePresence>
+        {roomToDelete && (
+          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col gap-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <h4 className="font-bold text-slate-900 text-sm">Excluir sala {roomToDelete}?</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Esta sala está vazia e será removida permanentemente do bate-papo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setRoomToDelete(null)}
+                  disabled={isDeletingRoom}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  id="btn-confirmar-exclusao-sala"
+                  onClick={() => handleDeleteRoom(roomToDelete)}
+                  disabled={isDeletingRoom}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                >
+                  {isDeletingRoom ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Excluindo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir sala</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
