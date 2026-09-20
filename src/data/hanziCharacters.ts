@@ -406,5 +406,49 @@ export const HANZI_CHARACTERS: HanziCharacter[] = [
       { hanzi: '二十', pinyin: 'èrshí', portuguese: 'Vinte (20)' },
       { hanzi: '十块', pinyin: 'shí kuài', portuguese: 'Dez yuans' }
     ]
+  },
+  {
+    id: 'qian_num',
+    hanzi: '千',
+    pinyin: 'qiān',
+    translation: 'mil (1.000)',
+    radical: '十 (shí - dez)',
+    radicalMeaning: 'Milhar / Grande quantidade',
+    strokeCount: 3,
+    hskLevel: 'HSK 2',
+    category: 'Números',
+    strokeOrderRule: '从上到下 (De cima para baixo): Primeiro a inclinação superior 撇, depois a barra 横, e por fim a haste vertical 竖.',
+    strokes: [
+      { strokeNumber: 1, name: '撇 (Piě)', type: 'pie', description: 'Traço curto inclinado no topo', directionGuide: 'De cima para a esquerda' },
+      { strokeNumber: 2, name: '横 (Héng)', type: 'heng', description: 'Traço horizontal no meio', directionGuide: 'Da esquerda para a direita' },
+      { strokeNumber: 3, name: '竖 (Shù)', type: 'shu', description: 'Traço vertical cortando ao centro', directionGuide: 'De cima para baixo firme' },
+    ],
+    compoundWords: [
+      { hanzi: '一千', pinyin: 'yī qiān', portuguese: 'Mil (1.000)' },
+      { hanzi: '二千', pinyin: 'èr qiān', portuguese: 'Dois mil (2.000)' },
+      { hanzi: '三千', pinyin: 'sān qiān', portuguese: 'Três mil (3.000)' }
+    ]
+  },
+  {
+    id: 'wan_num',
+    hanzi: '万',
+    pinyin: 'wàn',
+    translation: 'dez mil (10.000 / wan)',
+    radical: '一 (yī - um) / 勹',
+    radicalMeaning: 'Miríade / Dez mil / Inumerável',
+    strokeCount: 3,
+    hskLevel: 'HSK 2',
+    category: 'Números',
+    strokeOrderRule: '先横后折再撇: Primeiro o traço horizontal superior 横, em seguida o gancho curvado 横折钩, e por fim o traço inclinado à esquerda 撇.',
+    strokes: [
+      { strokeNumber: 1, name: '横 (Héng)', type: 'heng', description: 'Traço horizontal superior', directionGuide: 'Da esquerda para a direita' },
+      { strokeNumber: 2, name: '横折钩 (Héngzhégōu)', type: 'gou', description: 'Traço horizontal com descida e gancho', directionGuide: 'Horizontal, dobra para baixo e gancho à esquerda' },
+      { strokeNumber: 3, name: '撇 (Piě)', type: 'pie', description: 'Traço inclinado cruzando à esquerda', directionGuide: 'De cima para baixo à esquerda suave' },
+    ],
+    compoundWords: [
+      { hanzi: '一万', pinyin: 'yī wàn', portuguese: 'Dez mil (10.000)' },
+      { hanzi: '两万', pinyin: 'liǎng wàn', portuguese: 'Vinte mil (20.000)' },
+      { hanzi: '万岁', pinyin: 'wàn suì', portuguese: 'Viva! / Longa vida' }
+    ]
   }
 ];

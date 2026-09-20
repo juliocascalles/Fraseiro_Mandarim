@@ -13,7 +13,8 @@ import {
   Sparkles, X, CheckCircle2, RefreshCw, ExternalLink,
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
-  Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool
+  Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
+  Hash, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -22,9 +23,13 @@ import { PracticeMode } from './components/PracticeMode';
 import { QuizMode } from './components/QuizMode';
 import { ChatMode } from './components/ChatMode';
 import { HanziCanvasMode } from './components/HanziCanvasMode';
+import { GoogleLoginGate } from './components/GoogleLoginGate';
+import { ChineseNumbersModal } from './components/ChineseNumbersModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
+import { auth, isSuperUser, signOutUser } from './lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // --- Data ---
 const WORDS: Word[] = [
@@ -1960,6 +1965,18 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
 }
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(() => auth.currentUser);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [isNumbersModalOpen, setIsNumbersModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthChecking(false);
+    });
+    return () => unsub();
+  }, []);
+
   const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz'>('chat');
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [sequence, setSequence] = useState<Word[]>([]);
@@ -2152,6 +2169,22 @@ export default function App() {
     }
   };
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white font-sans flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-semibold text-slate-300">Carregando Fraseiro Mandarim...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Se o usuário não estiver autenticado via Conta Google, exige o login Google (Req 2)
+  if (!currentUser) {
+    return <GoogleLoginGate onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans p-4 md:p-8 flex flex-col items-center justify-center">
       {/* Main App Container */}
@@ -2166,7 +2199,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.09.18
+                  v1.2026.09.20
                 </span>
               </div>
               <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
@@ -2243,6 +2276,18 @@ export default function App() {
               </button>
             </div>
 
+            {/* Chinese Numbers Guide & Converter Modal Button */}
+            <button
+              id="open-numbers-btn"
+              type="button"
+              onClick={() => setIsNumbersModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-xs transition-all cursor-pointer"
+              title="Guia e Conversor de Números por Extenso em Mandarim (Regras 4.1 a 4.5)"
+            >
+              <Hash className="w-4 h-4 text-indigo-600" />
+              <span className="hidden sm:inline">Números</span>
+            </button>
+
             {/* Dictionary Modal Button (Single global button) */}
             <button
               id="open-dictionary-btn"
@@ -2253,6 +2298,47 @@ export default function App() {
               <BookOpen className="w-4 h-4 text-indigo-600" />
               <span className="hidden sm:inline">Dicionário</span>
             </button>
+
+            {/* User Profile Pill & Sign Out */}
+            {currentUser && (
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+                <div 
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                  title={`Conectado como: ${currentUser.displayName || currentUser.email || 'Usuário Google'}${isSuperUser(currentUser) ? ' (Superusuário Júlio Cascalles)' : ''}`}
+                >
+                  {currentUser.photoURL ? (
+                    <img 
+                      src={currentUser.photoURL} 
+                      alt="Avatar" 
+                      className="w-5 h-5 rounded-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center">
+                      {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="font-semibold text-slate-700 max-w-[120px] truncate hidden md:inline">
+                    {currentUser.displayName || currentUser.email}
+                  </span>
+                  {isSuperUser(currentUser) && (
+                    <span className="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-900 font-bold text-[9px] flex items-center gap-0.5">
+                      👑 Superusuário
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  id="btn-logout-google"
+                  type="button"
+                  onClick={() => signOutUser()}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="Sair da conta Google"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2310,6 +2396,12 @@ export default function App() {
             setIsDictionaryOpen(false);
           }}
           availableWordIds={availableWords.map(w => w.id)}
+        />
+
+        {/* Modal de Números por Extenso em Mandarim (Regras 4.1 a 4.5) */}
+        <ChineseNumbersModal
+          isOpen={isNumbersModalOpen}
+          onClose={() => setIsNumbersModalOpen(false)}
         />
       </div>
     </div>

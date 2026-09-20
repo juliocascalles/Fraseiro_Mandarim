@@ -216,6 +216,7 @@ export interface ChatRoom {
   code: string;
   name: string;
   createdBy?: string;
+  creatorEmail?: string;
   creatorName?: string;
   createdAt: string;
   lastActivity?: string;

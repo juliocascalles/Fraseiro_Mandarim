@@ -1,6 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isSuperUser() {
+      return request.auth != null && 
+        (request.auth.token.email == 'julio.gamedesign@gmail.com' || 
+         request.auth.token.email == 'julio.cascalles@gmail.com' ||
+         (request.auth.token.name != null && request.auth.token.name == 'Júlio Cascalles'));
+    }
+
+    function isRoomCreator(roomData) {
+      return request.auth != null && (
+        roomData.createdBy == request.auth.uid ||
+        (roomData.creatorEmail != null && roomData.creatorEmail == request.auth.token.email)
+      );
+    }
+
     // Rooms collection
     match /rooms/{roomId} {
       allow read: if true;
@@ -8,7 +23,11 @@ service cloud.firestore {
                     && request.resource.data.code.size() >= 3 
                     && request.resource.data.code.size() <= 32;
       allow update: if true;
-      allow delete: if roomId != 'ZH-GERAL';
+      allow delete: if roomId != 'ZH-GERAL' && (
+        isSuperUser() || 
+        isRoomCreator(resource.data) ||
+        request.auth != null
+      );
 
       // Messages in room
       match /messages/{messageId} {
@@ -17,8 +36,9 @@ service cloud.firestore {
                       && request.resource.data.phrase.hanzi is string
                       && request.resource.data.senderName is string;
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
-        allow delete: if true;
+        allow delete: if isSuperUser() || request.auth != null;
       }
     }
   }
 }
+

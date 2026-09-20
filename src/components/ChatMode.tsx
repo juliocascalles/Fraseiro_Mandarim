@@ -23,7 +23,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType, isSuperUser } from '../lib/firebase';
 import { Word, ChatMessage, ChatPhraseData, ChatRoom, PhraseValidationReport } from '../types';
 import { speakMandarin } from '../utils/speech';
 import { SentenceBuilder } from './SentenceBuilder';
@@ -141,10 +141,19 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     });
   };
 
-  // Determina se o usuário atual é o criador da sala ativa (apenas o criador pode limpar)
+  // Superusuário Júlio Cascalles (sem restrições)
+  const isCurrentUserAdmin = useMemo(() => {
+    return isSuperUser(auth.currentUser);
+  }, [auth.currentUser, currentUserId]);
+
+  // Determina se o usuário atual é o criador da sala ativa
   const isRoomCreator = useMemo(() => {
     if (!currentRoomCode || currentRoomCode === 'ZH-GERAL') {
       return false; // A sala comunitária pública não pode ser limpa por participantes individuais
+    }
+
+    if (isCurrentUserAdmin) {
+      return true; // Superusuário tem acesso completo
     }
 
     // 1. Criado localmente neste dispositivo/navegador
@@ -152,9 +161,13 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       return true;
     }
 
-    // 2. ID do Firebase Auth confere com o createdBy do documento da sala
+    // 2. ID ou e-mail do Firebase Auth confere com a sala
     const authUid = auth.currentUser?.uid || currentUserId;
+    const authEmail = auth.currentUser?.email?.toLowerCase().trim();
     if (authUid && currentRoom?.createdBy && currentRoom.createdBy === authUid) {
+      return true;
+    }
+    if (authEmail && currentRoom?.creatorEmail && currentRoom.creatorEmail.toLowerCase().trim() === authEmail) {
       return true;
     }
 
@@ -165,7 +178,45 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     }
 
     return false;
-  }, [currentRoomCode, currentRoom, myCreatedRooms, currentUserId]);
+  }, [currentRoomCode, currentRoom, myCreatedRooms, currentUserId, isCurrentUserAdmin]);
+
+  // Permissão para limpar mensagens da sala atual (Júlio Cascalles não tem restrições)
+  const canClearCurrentRoom = useMemo(() => {
+    if (isCurrentUserAdmin) return true;
+    if (!currentRoomCode || currentRoomCode === 'ZH-GERAL') return false;
+    return isRoomCreator;
+  }, [currentRoomCode, isCurrentUserAdmin, isRoomCreator]);
+
+  // Permissão para excluir uma sala (Júlio Cascalles não tem restrições; criador autenticado via Google; ou sala vazia)
+  const canDeleteRoom = (roomCode: string, room?: ChatRoom | null): boolean => {
+    if (!roomCode || roomCode === 'ZH-GERAL') return false;
+    if (isCurrentUserAdmin) return true; // Superusuário Júlio Cascalles sem restrições
+
+    const targetRoom = room || recentRooms.find((r) => r.code === roomCode) || (roomCode === currentRoomCode ? currentRoom : null);
+    const authUid = auth.currentUser?.uid || currentUserId;
+    const authEmail = auth.currentUser?.email?.toLowerCase().trim();
+
+    // 1. Identificação Google do criador
+    if (authUid && targetRoom?.createdBy && targetRoom.createdBy === authUid) {
+      return true;
+    }
+    if (authEmail && targetRoom?.creatorEmail && targetRoom.creatorEmail.toLowerCase().trim() === authEmail) {
+      return true;
+    }
+    if (myCreatedRooms.includes(roomCode)) {
+      return true;
+    }
+
+    // 2. Sala vazia
+    if (emptyRoomCodes.has(roomCode)) {
+      return true;
+    }
+    if (roomCode === currentRoomCode && messages.length === 0 && !isLoadingMessages) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Composer State
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -323,6 +374,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     setIsGenerating(true);
     const newCode = generateRandomRoomCode();
     const creatorId = auth.currentUser?.uid || currentUserId || getDeviceUserId();
+    const creatorEmail = auth.currentUser?.email || '';
+    const creatorDisplayName = auth.currentUser?.displayName || senderName;
 
     const newRoom: ChatRoom = {
       id: newCode,
@@ -330,7 +383,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       name: `Sala ${newCode}`,
       description: 'Sala de conversa com código compartilhado.',
       createdBy: creatorId,
-      creatorName: senderName,
+      creatorEmail: creatorEmail,
+      creatorName: creatorDisplayName,
       createdAt: new Date().toISOString(),
       lastActivity: new Date().toISOString()
     };
@@ -367,10 +421,10 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     setRoomInputText('');
   };
 
-  // Limpar todas as mensagens da sala atual no Firestore (Apenas criador)
+  // Limpar todas as mensagens da sala atual no Firestore (Criador ou Superusuário)
   const handleClearRoom = async () => {
-    if (!isRoomCreator) {
-      setFeedbackNotice('Apenas quem criou a sala tem permissão para limpá-la.');
+    if (!canClearCurrentRoom) {
+      setFeedbackNotice('Apenas quem criou a sala (conta Google) ou o superusuário Júlio Cascalles têm permissão para limpá-la.');
       setTimeout(() => setFeedbackNotice(null), 4000);
       setShowClearConfirm(false);
       return;
@@ -409,12 +463,19 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     }
   };
 
-  // Excluir sala vazia do Firebase
+  // Excluir sala do Firebase (Superusuário, Criador Google, ou Sala Vazia)
   const handleDeleteRoom = async (roomCodeToDelete: string) => {
     if (isDeletingRoom) return;
     if (!roomCodeToDelete || roomCodeToDelete === 'ZH-GERAL') {
       setFeedbackNotice('A sala comunitária aberta ZH-GERAL é padrão e não pode ser excluída.');
       setTimeout(() => setFeedbackNotice(null), 3500);
+      setRoomToDelete(null);
+      return;
+    }
+
+    if (!canDeleteRoom(roomCodeToDelete)) {
+      setFeedbackNotice('Permissão negada. Apenas o criador da sala (conta Google) ou o superusuário Júlio Cascalles podem excluir salas com mensagens.');
+      setTimeout(() => setFeedbackNotice(null), 4000);
       setRoomToDelete(null);
       return;
     }
@@ -457,7 +518,12 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       }
 
       setRoomToDelete(null);
-      setFeedbackNotice(`A sala vazia "${roomCodeToDelete}" foi excluída do bate-papo com sucesso.`);
+      const isSuper = isCurrentUserAdmin;
+      setFeedbackNotice(
+        isSuper
+          ? `A sala "${roomCodeToDelete}" foi excluída com sucesso pelo superusuário Júlio Cascalles.`
+          : `A sala "${roomCodeToDelete}" foi excluída do bate-papo com sucesso.`
+      );
       setTimeout(() => setFeedbackNotice(null), 4000);
       fetchRecentRooms();
     } catch (err) {
@@ -788,6 +854,12 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   const isThisRoomEmpty =
                     (r.code === currentRoomCode && messages.length === 0 && !isLoadingMessages) ||
                     emptyRoomCodes.has(r.code);
+                  const canDeleteThisRoom = canDeleteRoom(r.code, r);
+                  const isCreatorOfThisRoom = Boolean(
+                    (auth.currentUser?.uid && r.createdBy === auth.currentUser.uid) ||
+                    (auth.currentUser?.email && r.creatorEmail && r.creatorEmail.toLowerCase() === auth.currentUser.email.toLowerCase()) ||
+                    myCreatedRooms.includes(r.code)
+                  );
 
                   return (
                     <div
@@ -806,8 +878,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                             {r.code}
                           </span>
 
-                          {/* Botão de lixeira na sala correspondente quando vazia */}
-                          {isThisRoomEmpty && (
+                          {/* Botão de lixeira na sala correspondente (Superusuário, Criador Google ou Sala Vazia) */}
+                          {canDeleteThisRoom && (
                             <button
                               type="button"
                               id={`btn-excluir-sala-${r.code}`}
@@ -816,7 +888,13 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                                 setRoomToDelete(r.code);
                               }}
                               className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 transition-all cursor-pointer shadow-2xs active:scale-90"
-                              title="Salas vazias podem ser excluídas do bate-papo. Clique para excluir esta sala."
+                              title={
+                                isCurrentUserAdmin
+                                  ? '👑 Superusuário Júlio Cascalles: excluir sala sem restrições'
+                                  : isCreatorOfThisRoom
+                                  ? 'Você é o criador desta sala (Conta Google). Clique para excluir.'
+                                  : 'Salas vazias podem ser excluídas do bate-papo. Clique para excluir esta sala.'
+                              }
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -828,38 +906,68 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                         <span className="text-[11px] text-slate-500 mt-0.5 truncate">{r.description}</span>
                       )}
 
-                      {/* Indicador de sala vazia quando detectada */}
-                      {isThisRoomEmpty && (
-                        <div className="flex items-center justify-between mt-1 text-[10px] text-rose-600 font-medium">
-                          <span className="flex items-center gap-1">
+                      {/* Status da sala */}
+                      <div className="flex items-center justify-between mt-1 text-[10px]">
+                        {isCurrentUserAdmin ? (
+                          <span className="text-amber-700 font-semibold flex items-center gap-1">
+                            👑 Exclusão liberada
+                          </span>
+                        ) : isCreatorOfThisRoom ? (
+                          <span className="text-indigo-700 font-semibold flex items-center gap-1">
+                            Criada por você
+                          </span>
+                        ) : isThisRoomEmpty ? (
+                          <span className="text-rose-600 font-medium flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                             Sala vazia
                           </span>
-                          <span className="text-[9px] text-rose-500 underline font-semibold">Excluir</span>
-                        </div>
-                      )}
+                        ) : (
+                          <span className="text-slate-400 text-[9px]">Ativa</span>
+                        )}
+
+                        {canDeleteThisRoom && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRoomToDelete(r.code);
+                            }}
+                            className="text-[9px] text-rose-500 hover:text-rose-700 underline font-semibold cursor-pointer"
+                          >
+                            Excluir
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
             </div>
           </div>
 
-          {/* Canto esquerdo inferior: Avatar e Identidade do Usuário (Req 6) */}
+          {/* Canto esquerdo inferior: Avatar e Identidade do Usuário (Req 6 e Google Auth) */}
           <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col gap-3">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-indigo-600" />
-              Meu Perfil
+              Meu Perfil Google
             </span>
 
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100/70 border border-indigo-200 flex items-center justify-center text-2xl shrink-0 shadow-2xs">
-                {senderAvatar}
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100/70 border border-indigo-200 flex items-center justify-center text-2xl shrink-0 shadow-2xs overflow-hidden">
+                {auth.currentUser?.photoURL ? (
+                  <img
+                    src={auth.currentUser.photoURL}
+                    alt="Foto do perfil"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  senderAvatar
+                )}
               </div>
 
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-xs font-bold text-slate-800 truncate">
-                    {senderName}
+                    {auth.currentUser?.displayName || senderName}
                   </span>
                   <button
                     type="button"
@@ -871,12 +979,26 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="text-[10px] font-semibold text-emerald-700 truncate">
-                    Firebase Ativo
+                {auth.currentUser?.email && (
+                  <span className="text-[10px] text-slate-500 truncate" title={auth.currentUser.email}>
+                    {auth.currentUser.email}
                   </span>
-                </div>
+                )}
+
+                {isCurrentUserAdmin ? (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold text-[9px] flex items-center gap-1">
+                      👑 Superusuário
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="text-[10px] font-semibold text-emerald-700 truncate">
+                      Conta Google Ativa
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -919,18 +1041,33 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* Botão Limpar Sala - EXCLUSIVO DO CRIADOR DA SALA */}
-                {isRoomCreator && (
+                {/* Botão Limpar Sala */}
+                {canClearCurrentRoom && (
                   <button
                     type="button"
                     id="btn-limpar-sala-mensagens"
                     onClick={() => setShowClearConfirm(true)}
                     disabled={messages.length === 0 || isClearingRoom}
                     className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-200"
-                    title="Limpar mensagens desta sala (Apenas criador)"
+                    title={isCurrentUserAdmin ? "Limpar todas as frases (Superusuário Júlio Cascalles)" : "Limpar frases desta sala (Criador)"}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Limpar sala</span>
+                  </button>
+                )}
+
+                {/* Botão Excluir Sala no topo da conversa */}
+                {currentRoomCode !== 'ZH-GERAL' && canDeleteRoom(currentRoomCode, currentRoom) && (
+                  <button
+                    type="button"
+                    id="btn-excluir-sala-header"
+                    onClick={() => setRoomToDelete(currentRoomCode)}
+                    disabled={isDeletingRoom}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:text-rose-800 transition-colors cursor-pointer px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200"
+                    title={isCurrentUserAdmin ? "Excluir sala sem restrições (Superusuário Júlio Cascalles)" : "Excluir sala"}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir sala</span>
                   </button>
                 )}
 
@@ -945,9 +1082,9 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               </div>
             </div>
 
-            {/* Confirmação para Limpar Sala - Visível apenas para o criador */}
+            {/* Confirmação para Limpar Sala */}
             <AnimatePresence>
-              {showClearConfirm && isRoomCreator && (
+              {showClearConfirm && canClearCurrentRoom && (
                 <motion.div
                   initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                   animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
@@ -965,7 +1102,9 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                           <strong className="block font-semibold">Limpar frases da sala {currentRoomCode}?</strong>
                         </div>
                         <span className="text-[11px] text-rose-700">
-                          Como criador desta sala, você apagará todas as {messages.length} {messages.length === 1 ? 'mensagem' : 'mensagens'} para todos os participantes.
+                          {isCurrentUserAdmin
+                            ? `Superusuário Júlio Cascalles: você tem permissão irrestrita para limpar todas as ${messages.length} ${messages.length === 1 ? 'mensagem' : 'mensagens'}.`
+                            : `Como criador desta sala (conta Google), você apagará todas as ${messages.length} ${messages.length === 1 ? 'mensagem' : 'mensagens'} para todos os participantes.`}
                         </span>
                       </div>
                     </div>
@@ -1185,7 +1324,9 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                 <div className="flex flex-col">
                   <h4 className="font-bold text-slate-900 text-sm">Excluir sala {roomToDelete}?</h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Esta sala está vazia e será removida permanentemente do bate-papo.
+                    {isCurrentUserAdmin
+                      ? 'Autenticado como Superusuário Júlio Cascalles. Esta sala será excluída do bate-papo sem restrições.'
+                      : 'Esta sala será removida permanentemente do bate-papo.'}
                   </p>
                 </div>
               </div>
