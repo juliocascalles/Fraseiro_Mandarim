@@ -22,13 +22,14 @@ import {
   writeBatch,
   deleteDoc
 } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { db, auth, initAnonymousAuth, handleFirestoreError, OperationType, isSuperUser } from '../lib/firebase';
 import { Word, ChatMessage, ChatPhraseData, ChatRoom, PhraseValidationReport } from '../types';
 import { speakMandarin } from '../utils/speech';
 import { SentenceBuilder } from './SentenceBuilder';
 
 export interface ChatModeProps {
+  currentUser?: FirebaseUser | null;
   allWords: Word[];
   builderPhrase?: {
     hanzi: string;
@@ -60,6 +61,7 @@ const generateRandomRoomCode = (): string => {
 };
 
 export const ChatMode: React.FC<ChatModeProps> = ({
+  currentUser,
   allWords,
   builderPhrase,
   builderSequence,
@@ -141,10 +143,15 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     });
   };
 
-  // Superusuário Júlio Cascalles (sem restrições)
+  // Usuário autenticado ativo
+  const activeAuthUser = currentUser || auth.currentUser;
+
+  // Superusuário Júlio Cascalles:
+  // Verificação estrita por e-mail oficial (julio.gamedesign@gmail.com).
+  // Somente Júlio Cascalles possui privilégios de superusuário.
   const isCurrentUserAdmin = useMemo(() => {
-    return isSuperUser(auth.currentUser);
-  }, [auth.currentUser, currentUserId]);
+    return isSuperUser(activeAuthUser);
+  }, [activeAuthUser, currentUserId]);
 
   // Determina se o usuário atual é o criador da sala ativa
   const isRoomCreator = useMemo(() => {
@@ -162,8 +169,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     }
 
     // 2. ID ou e-mail do Firebase Auth confere com a sala
-    const authUid = auth.currentUser?.uid || currentUserId;
-    const authEmail = auth.currentUser?.email?.toLowerCase().trim();
+    const authUid = activeAuthUser?.uid || currentUserId;
+    const authEmail = activeAuthUser?.email?.toLowerCase().trim();
     if (authUid && currentRoom?.createdBy && currentRoom.createdBy === authUid) {
       return true;
     }
@@ -178,25 +185,27 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     }
 
     return false;
-  }, [currentRoomCode, currentRoom, myCreatedRooms, currentUserId, isCurrentUserAdmin]);
+  }, [currentRoomCode, currentRoom, myCreatedRooms, currentUserId, isCurrentUserAdmin, activeAuthUser]);
 
-  // Permissão para limpar mensagens da sala atual (Júlio Cascalles não tem restrições)
+  // Permissão para limpar mensagens da sala atual (Somente Júlio Cascalles ou o criador da sala)
   const canClearCurrentRoom = useMemo(() => {
     if (isCurrentUserAdmin) return true;
     if (!currentRoomCode || currentRoomCode === 'ZH-GERAL') return false;
     return isRoomCreator;
   }, [currentRoomCode, isCurrentUserAdmin, isRoomCreator]);
 
-  // Permissão para excluir uma sala (Júlio Cascalles não tem restrições; criador autenticado via Google; ou sala vazia)
+  // Permissão para excluir uma sala:
+  // - Superusuário Júlio Cascalles: sem restrições (pode excluir qualquer sala)
+  // - Usuário comum: SOMENTE pode excluir salas criadas por ele próprio (identificado via Google)
   const canDeleteRoom = (roomCode: string, room?: ChatRoom | null): boolean => {
     if (!roomCode || roomCode === 'ZH-GERAL') return false;
     if (isCurrentUserAdmin) return true; // Superusuário Júlio Cascalles sem restrições
 
     const targetRoom = room || recentRooms.find((r) => r.code === roomCode) || (roomCode === currentRoomCode ? currentRoom : null);
-    const authUid = auth.currentUser?.uid || currentUserId;
-    const authEmail = auth.currentUser?.email?.toLowerCase().trim();
+    const authUid = activeAuthUser?.uid || currentUserId;
+    const authEmail = activeAuthUser?.email?.toLowerCase().trim();
 
-    // 1. Identificação Google do criador
+    // Somente o criador da própria sala tem permissão para excluí-la
     if (authUid && targetRoom?.createdBy && targetRoom.createdBy === authUid) {
       return true;
     }
@@ -204,14 +213,6 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       return true;
     }
     if (myCreatedRooms.includes(roomCode)) {
-      return true;
-    }
-
-    // 2. Sala vazia
-    if (emptyRoomCodes.has(roomCode)) {
-      return true;
-    }
-    if (roomCode === currentRoomCode && messages.length === 0 && !isLoadingMessages) {
       return true;
     }
 
@@ -891,9 +892,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                               title={
                                 isCurrentUserAdmin
                                   ? '👑 Superusuário Júlio Cascalles: excluir sala sem restrições'
-                                  : isCreatorOfThisRoom
-                                  ? 'Você é o criador desta sala (Conta Google). Clique para excluir.'
-                                  : 'Salas vazias podem ser excluídas do bate-papo. Clique para excluir esta sala.'
+                                  : 'Você é o criador desta sala (Conta Google). Clique para excluir.'
                               }
                             >
                               <Trash2 className="w-3.5 h-3.5" />

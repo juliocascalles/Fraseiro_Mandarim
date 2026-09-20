@@ -66,9 +66,9 @@ export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess }) =
             </span>
           </div>
           <div className="flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <Sparkles className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
             <span className="text-xs text-slate-600 leading-snug">
-              <strong>Superusuário:</strong> A conta de <em>Júlio Cascalles</em> possui permissões completas e irrestritas para limpar ou excluir qualquer sala.
+              <strong>Estudo Interativo:</strong> Prática guiada com dicionário, traçado Hanzi e conversor de números.
             </span>
           </div>
         </div>

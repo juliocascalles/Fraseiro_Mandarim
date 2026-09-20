@@ -2304,7 +2304,7 @@ export default function App() {
               <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
                 <div 
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                  title={`Conectado como: ${currentUser.displayName || currentUser.email || 'Usuário Google'}${isSuperUser(currentUser) ? ' (Superusuário Júlio Cascalles)' : ''}`}
+                  title={`Conectado como: ${currentUser.displayName || currentUser.email || 'Usuário Google'}${isSuperUser(currentUser) ? ' (Superusuário)' : ''}`}
                 >
                   {currentUser.photoURL ? (
                     <img 
@@ -2345,6 +2345,7 @@ export default function App() {
         {/* View Switch: Bate-papo (com construtor de frases integrado), Modo Hanzi, Quiz, ou Prática */}
         {activeTab === 'chat' ? (
           <ChatMode
+            currentUser={currentUser}
             allWords={WORDS}
             builderPhrase={sequence.length > 0 ? {
               hanzi: sequence.map(w => w.hanzi).join(""),

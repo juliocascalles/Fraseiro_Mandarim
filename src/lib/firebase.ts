@@ -32,21 +32,16 @@ export const signOutUser = async (): Promise<void> => {
 };
 
 /**
- * Superusuário Júlio Cascalles:
- * Não terá restrições para excluir ou limpar salas.
+ * Superusuário oficial:
+ * Somente o usuário Júlio Cascalles (julio.gamedesign@gmail.com) é superusuário.
+ * Nenhum outro usuário ou conta Google recebe privilégios de superusuário.
  */
-export function isSuperUser(user: { email?: string | null; displayName?: string | null } | null | undefined): boolean {
-  if (!user) return false;
-  const email = (user.email || '').toLowerCase().trim();
-  const name = (user.displayName || '').toLowerCase().trim();
-  return (
-    email === 'julio.gamedesign@gmail.com' ||
-    email.includes('julio.gamedesign') ||
-    email.includes('cascalles') ||
-    name.includes('júlio cascalles') ||
-    name.includes('julio cascalles') ||
-    name.includes('cascalles')
-  );
+export const SUPER_USER_EMAIL = 'julio.gamedesign@gmail.com';
+
+export function isSuperUser(user: { email?: string | null } | null | undefined): boolean {
+  if (!user || !user.email) return false;
+  const email = user.email.toLowerCase().trim();
+  return email === SUPER_USER_EMAIL;
 }
 
 // Sign in anonymously on load if no user is signed in (fallback)
