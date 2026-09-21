@@ -17,8 +17,11 @@ export interface SentenceBuilderProps {
   checkIsValidSentence: (sequence: Word[]) => boolean;
   getNaturalTranslation: (sequence: Word[]) => string;
   validateAndBuildPhrase: (input: string) => PhraseValidationReport;
+  accompanyingText?: string;
+  setAccompanyingText?: (text: string) => void;
   onSendMessage?: () => void;
   isSubmitting?: boolean;
+  userName?: string;
 }
 
 const normalizePinyin = (text: string): string => {
@@ -73,6 +76,7 @@ export const SentenceBuilder: React.FC<SentenceBuilderProps> = ({
   setAccompanyingText,
   onSendMessage,
   isSubmitting = false,
+  userName,
 }) => {
   const [localInsertIndex, setLocalInsertIndex] = useState<number>(sequence.length);
   const [searchQuery, setSearchQuery] = useState('');
@@ -370,53 +374,73 @@ export const SentenceBuilder: React.FC<SentenceBuilderProps> = ({
             )}
           </div>
 
-          {sequence.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => speakMandarin(sequence.map(w => w.hanzi).join(''))}
-                className="p-1.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition-colors shadow-xs cursor-pointer"
-                title="Ouvir pronúncia da frase"
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-              </button>
+          {sequence.length > 0 && (() => {
+            const isWoJiao = sequence.length >= 2 && 
+              sequence[sequence.length - 2].id === 'wo' && 
+              sequence[sequence.length - 1].id === 'jiao';
+            const activeUser = userName || (typeof window !== 'undefined' ? localStorage.getItem('chat_sender_name') : '') || 'Estudante';
+            const displayHanzi = isWoJiao ? `${sequence.map(w => w.hanzi).join('')} ${activeUser}` : sequence.map(w => w.hanzi).join('');
+            const displayPinyin = isWoJiao ? `${sequence.map(w => w.label).join(' ')} ${activeUser}` : sequence.map(w => w.label).join(' ');
+            const displayTrans = isWoJiao ? `Eu me chamo ${activeUser}.` : getNaturalTranslation(sequence);
 
-              <a
-                href={`https://translate.google.com/?sl=zh-CN&tl=pt&text=${encodeURIComponent(sequence.map(w => w.hanzi).join(''))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition-colors shadow-xs cursor-pointer"
-                title="Ver no Google Tradutor"
-              >
-                <Globe className="w-3.5 h-3.5" />
-              </a>
+            return (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => speakMandarin(displayHanzi)}
+                  className="p-1.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition-colors shadow-xs cursor-pointer"
+                  title="Ouvir pronúncia da frase"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
 
-              <button
-                type="button"
-                onClick={clearSequence}
-                className="p-1.5 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors shadow-xs cursor-pointer"
-                title="Limpar frase"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+                <a
+                  href={`https://translate.google.com/?sl=zh-CN&tl=pt&text=${encodeURIComponent(displayHanzi)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition-colors shadow-xs cursor-pointer"
+                  title="Ver no Google Tradutor"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={clearSequence}
+                  className="p-1.5 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors shadow-xs cursor-pointer"
+                  title="Limpar frase"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Visualização de Texto da Frase Montada */}
-        {sequence.length > 0 ? (
-          <div className="flex flex-col gap-1 p-3 rounded-2xl bg-white/80 border border-indigo-100/90 shadow-2xs">
-            <span className="text-2xl sm:text-3xl font-bold text-indigo-950 tracking-wide">
-              {sequence.map(w => w.hanzi).join('')}
-            </span>
-            <span className="font-mono text-xs sm:text-sm text-indigo-700 font-semibold">
-              {sequence.map(w => w.label).join(' ')}
-            </span>
-            <span className="text-xs sm:text-sm text-slate-600 font-medium">
-              {getNaturalTranslation(sequence)}
-            </span>
-          </div>
-        ) : (
+        {sequence.length > 0 ? (() => {
+          const isWoJiao = sequence.length >= 2 && 
+            sequence[sequence.length - 2].id === 'wo' && 
+            sequence[sequence.length - 1].id === 'jiao';
+          const activeUser = userName || (typeof window !== 'undefined' ? localStorage.getItem('chat_sender_name') : '') || 'Estudante';
+          const displayHanzi = isWoJiao ? `${sequence.map(w => w.hanzi).join('')} ${activeUser}` : sequence.map(w => w.hanzi).join('');
+          const displayPinyin = isWoJiao ? `${sequence.map(w => w.label).join(' ')} ${activeUser}` : sequence.map(w => w.label).join(' ');
+          const displayTrans = isWoJiao ? `Eu me chamo ${activeUser}.` : getNaturalTranslation(sequence);
+
+          return (
+            <div className="flex flex-col gap-1 p-3 rounded-2xl bg-white/80 border border-indigo-100/90 shadow-2xs">
+              <span className="text-2xl sm:text-3xl font-bold text-indigo-950 tracking-wide">
+                {displayHanzi}
+              </span>
+              <span className="font-mono text-xs sm:text-sm text-indigo-700 font-semibold">
+                {displayPinyin}
+              </span>
+              <span className="text-xs sm:text-sm text-slate-600 font-medium">
+                {displayTrans}
+              </span>
+            </div>
+          );
+        })() : (
           <div className="p-3 rounded-2xl bg-white/60 border border-dashed border-indigo-200 text-center text-xs text-indigo-900/60 font-medium">
             Selecione palavras acima ou digite na pesquisa para formar a mensagem que será enviada.
           </div>

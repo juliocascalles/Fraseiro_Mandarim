@@ -203,6 +203,8 @@ const WORDS: Word[] = [
   { id: 'jiu', label: 'jiu', hanzi: '九', translation: '9', category: 'number', icon: Type, hskLevel: 'HSK 1' },
   { id: 'shi_num', label: 'shí', hanzi: '十', translation: '10 / dezena', category: 'number', icon: Type, hskLevel: 'HSK 1' },
   { id: 'bai', label: 'bǎi', hanzi: '百', translation: '100 / centena', category: 'number', icon: Type, hskLevel: 'HSK 1' },
+  { id: 'qian_num', label: 'qiān', hanzi: '千', translation: '1.000 / milhar', category: 'number', icon: Type, hskLevel: 'HSK 2' },
+  { id: 'wan', label: 'wàn', hanzi: '万', translation: '10.000 / dezena de milhar', category: 'number', icon: Type, hskLevel: 'HSK 2' },
 
   // Etiquette
   { id: 'qing', label: 'qing', hanzi: '请', translation: 'por favor', category: 'etiquette', icon: UserCheck, hskLevel: 'HSK 1' },
@@ -369,6 +371,8 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'you_verb') return 'you';
     if (w.id === 'ta_female') return 'ta';
     if (w.id === 'shi_num') return 'shi';
+    if (w.id === 'qian_num') return 'qian';
+    if (w.id === 'wan') return 'wan';
     if (w.id === 'ge_class') return 'ge';
     if (w.id === 'na_dem') return 'na';
     if (w.id === 'nali_there') return 'nali';
@@ -559,7 +563,26 @@ function getNaturalTranslation(seq: Word[]): string {
     'ta chi shenme': 'O que ele/ela vai comer?',
     'chi yidian': 'Comer um pouco.',
     'chi yidian ba': 'Coma um pouco!',
+
+    // Números compostos e grandezas
+    'yi bai': '100 / cem',
+    'er bai': '200 / duzentos',
+    'liang bai': '200 / duzentos',
+    'san bai': '300 / trezentos',
+    'yi qian': '1.000 / mil',
+    'er qian': '2.000 / dois mil',
+    'liang qian': '2.000 / dois mil',
+    'yi wan': '10.000 / dez mil',
+    'liang wan': '20.000 / vinte mil',
+    'yi wan er qian san bai si shi wu': '12.345 / doze mil trezentos e quarenta e cinco',
+    'yi wan ling wu': '10.005 / dez mil e cinco',
   };
+
+  // Regra especial: se a frase termina com 'wo jiao' (我叫), colocar o nome do usuário na frente
+  if (key === 'wo jiao' || key.endsWith(' wo jiao')) {
+    const userDisplay = localStorage.getItem('chat_sender_name') || 'Estudante';
+    return `Eu me chamo ${userDisplay}.`;
+  }
 
   if (IDIOMS[key]) {
     return IDIOMS[key];
@@ -640,6 +663,8 @@ function checkIsValid(seq: Word[]): boolean {
     const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
     const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing', 'xiang'].includes(w.id));
     if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
+    // 'wo jiao' é uma frase válida completa (Eu me chamo [Nome do usuário])
+    if (last.id === 'jiao' && seq.some(w => w.id === 'wo')) return true;
     if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb', 'kan', 'xuexi', 'zuo', 'jin', 'da_call', 'fa_verb', 'zhidao'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'wo xiang chi', 'wo xiang qu', 'wo xiang kan'
     if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb', 'xiang'].includes(last.id)) {
       return false;
@@ -1327,6 +1352,20 @@ function findCandidatesForToken(rawToken: string): Word[] {
     if (word) return [word];
   }
 
+  // 1.5 Special check for 'qian' (千 = 1.000 / milhar vs 钱 = dinheiro)
+  if (norm === 'qian') {
+    const qianNum = WORDS.find(w => w.id === 'qian_num');
+    const qianThing = WORDS.find(w => w.id === 'qian');
+    const res: Word[] = [];
+    if (qianNum) res.push(qianNum);
+    if (qianThing) res.push(qianThing);
+    return res;
+  }
+  if (norm === 'wan') {
+    const wanWord = WORDS.find(w => w.id === 'wan');
+    if (wanWord) return [wanWord];
+  }
+
   // 2. Direct Hanzi match
   const hanziMatches = WORDS.filter(w => w.hanzi === rawToken.trim());
   if (hanziMatches.length > 0) return hanziMatches;
@@ -1830,6 +1869,23 @@ function validateAndBuildPhrase(input: string): PhraseValidationReport {
     const candidates = findCandidatesForToken(rawToken);
 
     if (candidates.length === 0) {
+      // Caso especial: após "wo jiao" (我叫), a palavra subsequente é o nome do usuário (ex: "wo jiao Maria")
+      if (currentSeq.length >= 2 && currentSeq[currentSeq.length - 2].id === 'wo' && currentSeq[currentSeq.length - 1].id === 'jiao') {
+        const cleanName = rawToken.trim();
+        if (cleanName) {
+          try {
+            localStorage.setItem('chat_sender_name', cleanName);
+          } catch {}
+        }
+        steps.push({
+          token: rawToken,
+          word: null,
+          status: 'valid',
+          position: i + 1,
+        });
+        continue;
+      }
+
       // Word does not exist in dictionary - try to find closest match
       const closest = findClosestWordForToken(rawToken, currentSeq);
       const suggestionText = closest

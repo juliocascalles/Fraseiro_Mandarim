@@ -46,19 +46,33 @@ export interface ChatModeProps {
   checkIsValidSentence: (sequence: Word[]) => boolean;
   getNaturalTranslation: (sequence: Word[]) => string;
   validateAndBuildPhrase: (input: string) => PhraseValidationReport;
+  onOpenDictionary?: () => void;
 }
 
 const AVATARS = ['🐼', '🐉', '🦩', '🐯', '🦊', '🐰', '🎋', '🏮'];
 
-// Helper to generate engaging alphanumeric codes like ZK7H9N4, YY0T8J17
-const generateRandomRoomCode = (): string => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let result = '';
-  for (let i = 0; i < 7; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
+// 10 Nomes reservados inspirados na cultura chinesa para as salas temáticas (Req 2)
+export interface CulturalRoomTheme {
+  id: string;
+  name: string;
+  hanzi: string;
+  pinyin: string;
+  meaning: string;
+  icon: string;
+}
+
+export const CULTURAL_ROOM_THEMES: CulturalRoomTheme[] = [
+  { id: 'dragao', name: 'Sala Dragão', hanzi: '龙', pinyin: 'Lóng', meaning: 'Poder, nobreza e prosperidade na cultura chinesa', icon: '🐉' },
+  { id: 'panda', name: 'Sala Panda', hanzi: '熊猫', pinyin: 'Xióngmāo', meaning: 'Tesouro nacional chinês e símbolo de paz', icon: '🐼' },
+  { id: 'jade', name: 'Sala Jade', hanzi: '玉', pinyin: 'Yù', meaning: 'Pedra preciosa de pureza, sabedoria e virtude', icon: '💎' },
+  { id: 'fenix', name: 'Sala Fênix', hanzi: '凤凰', pinyin: 'Fènghuáng', meaning: 'Ave mítica de harmonia, renascimento e graça', icon: '🪶' },
+  { id: 'bambu', name: 'Sala Bambu', hanzi: '竹', pinyin: 'Zhú', meaning: 'Símbolo de integridade, flexibilidade e resiliência', icon: '🎋' },
+  { id: 'lotus', name: 'Sala Lótus', hanzi: '莲花', pinyin: 'Liánhuā', meaning: 'Flor pura que floresce imaculada sobre as águas', icon: '🪷' },
+  { id: 'cha', name: 'Sala Chá', hanzi: '茶', pinyin: 'Chá', meaning: 'Tradição milenar da harmonia e serenidade do chá', icon: '🍵' },
+  { id: 'lanterna', name: 'Sala Lanterna', hanzi: '灯笼', pinyin: 'Dēnglong', meaning: 'Símbolo das festividades chinesas, calor e esperança', icon: '🏮' },
+  { id: 'seda', name: 'Sala Seda', hanzi: '丝绸', pinyin: 'Sīchóu', meaning: 'Refinamento e o legado histórico da Rota da Seda', icon: '🧵' },
+  { id: 'peonia', name: 'Sala Peônia', hanzi: '牡丹', pinyin: 'Mǔdan', meaning: 'Rainha das flores chinesas, símbolo de honra e riqueza', icon: '🌺' },
+];
 
 export const ChatMode: React.FC<ChatModeProps> = ({
   currentUser,
@@ -254,7 +268,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
   // Fetch recent active rooms from Firestore for discovery
   const fetchRecentRooms = async () => {
     try {
-      const q = query(collection(db, 'rooms'), orderBy('lastActivity', 'desc'), limit(8));
+      const q = query(collection(db, 'rooms'), orderBy('lastActivity', 'desc'), limit(25));
       const snap = await getDocs(q);
       const rooms: ChatRoom[] = [];
       snap.forEach((d) => {
@@ -369,56 +383,104 @@ export const ChatMode: React.FC<ChatModeProps> = ({
     setTimeout(() => setCopiedCodeSuccess(false), 2500);
   };
 
-  // 1- Botão "Gerar sala": Gera um código aleatório e entra imediatamente
+  // 1- Botão "Gerar sala": Atribui tema da cultura chinesa e limita a 10 salas (Req 2)
   const handleGenerateRoom = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
-    const newCode = generateRandomRoomCode();
-    const creatorId = auth.currentUser?.uid || currentUserId || getDeviceUserId();
-    const creatorEmail = auth.currentUser?.email || '';
-    const creatorDisplayName = auth.currentUser?.displayName || senderName;
-
-    const newRoom: ChatRoom = {
-      id: newCode,
-      code: newCode,
-      name: `Sala ${newCode}`,
-      description: 'Sala de conversa com código compartilhado.',
-      createdBy: creatorId,
-      creatorEmail: creatorEmail,
-      creatorName: creatorDisplayName,
-      createdAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString()
-    };
 
     try {
+      // 1. Obter todas as salas existentes para verificar o limite de 10 salas culturais
+      const roomsSnap = await getDocs(collection(db, 'rooms'));
+      const existingRooms: ChatRoom[] = [];
+      roomsSnap.forEach((d) => {
+        existingRooms.push({ id: d.id, ...d.data() } as ChatRoom);
+      });
+      const activeCustomRooms = existingRooms.filter((r) => r.code !== 'ZH-GERAL');
+
+      // Limite de 10 salas culturais ativas (Req 2)
+      if (activeCustomRooms.length >= 10) {
+        setFeedbackNotice('Limite de 10 salas culturais atingido (10/10). Não é permitido criar mais salas. Exclua uma sala existente para liberar espaço.');
+        setTimeout(() => setFeedbackNotice(null), 8000);
+        setIsGenerating(false);
+        return;
+      }
+
+      // 2. Encontrar o próximo nome cultural disponível dos 10 reservados
+      const usedNames = new Set(
+        activeCustomRooms.map((r) => (r.name || '').toLowerCase().trim())
+      );
+      const availableTheme = CULTURAL_ROOM_THEMES.find(
+        (t) => !usedNames.has(t.name.toLowerCase().trim())
+      );
+
+      if (!availableTheme) {
+        setFeedbackNotice('Todos os 10 nomes culturais já estão em uso (10/10). Exclua uma sala existente para criar uma nova.');
+        setTimeout(() => setFeedbackNotice(null), 8000);
+        setIsGenerating(false);
+        return;
+      }
+
+      const newCode = `ZH-${availableTheme.id.toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+      const creatorId = auth.currentUser?.uid || currentUserId || getDeviceUserId();
+      const creatorEmail = auth.currentUser?.email || '';
+      const creatorDisplayName = auth.currentUser?.displayName || senderName;
+
+      const newRoom: ChatRoom = {
+        id: newCode,
+        code: newCode,
+        name: availableTheme.name,
+        description: `${availableTheme.icon} ${availableTheme.hanzi} (${availableTheme.pinyin}) — ${availableTheme.meaning}`,
+        icon: availableTheme.icon,
+        createdBy: creatorId,
+        creatorEmail: creatorEmail,
+        creatorName: creatorDisplayName,
+        createdAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString()
+      };
+
       await setDoc(doc(db, 'rooms', newCode), newRoom);
       registerCreatedRoom(newCode);
       setCurrentRoomCode(newCode);
       setRoomInputText('');
-      setFeedbackNotice(`Nova sala gerada com o código "${newCode}"! Você é o criador e pode limpá-la quando quiser.`);
+      setFeedbackNotice(`Nova sala criada com sucesso: "${availableTheme.name}" (${activeCustomRooms.length + 1}/10 salas culturais ativas).`);
       setTimeout(() => setFeedbackNotice(null), 8000);
       fetchRecentRooms();
     } catch (err) {
-      const errInfo = handleFirestoreError(err, OperationType.CREATE, `rooms/${newCode}`);
-      setFirestoreError(`Falha ao gerar sala: ${errInfo.error}`);
+      const errInfo = handleFirestoreError(err, OperationType.CREATE, 'rooms');
+      setFirestoreError(`Falha ao gerar sala cultural: ${errInfo.error}`);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 2- Campo de texto + botão "Entrar": Permite entrar na sala com o código digitado
+  // 2- Campo de texto + botão "Entrar": Permite entrar na sala por código ou por nome cultural
   const handleEnterRoom = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleanCode = roomInputText.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
-    if (!cleanCode) {
-      setFeedbackNotice('Por favor, digite um código de sala (ex: ZK7H9N4).');
+    const rawInput = roomInputText.trim();
+    if (!rawInput) {
+      setFeedbackNotice('Por favor, digite o nome da sala (ex: Dragão, Panda, Jade) ou o código.');
       setTimeout(() => setFeedbackNotice(null), 4000);
       return;
     }
 
+    // Busca nas salas ativas por nome cultural
+    const matchedRoom = recentRooms.find((r) => 
+      (r.name && r.name.toLowerCase().includes(rawInput.toLowerCase())) ||
+      (r.code && r.code.toUpperCase() === rawInput.toUpperCase().replace(/\s+/g, ''))
+    );
+
+    if (matchedRoom) {
+      setCurrentRoomCode(matchedRoom.code);
+      setFeedbackNotice(`Você entrou na "${matchedRoom.name}".`);
+      setTimeout(() => setFeedbackNotice(null), 5000);
+      setRoomInputText('');
+      return;
+    }
+
+    const cleanCode = rawInput.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
     setCurrentRoomCode(cleanCode);
-    setFeedbackNotice(`Você entrou na sala "${cleanCode}". Todas as mensagens enviadas e recebidas são desta sala!`);
-    setTimeout(() => setFeedbackNotice(null), 6000);
+    setFeedbackNotice(`Você entrou na sala "${cleanCode}".`);
+    setTimeout(() => setFeedbackNotice(null), 5000);
     setRoomInputText('');
   };
 
@@ -545,10 +607,22 @@ export const ChatMode: React.FC<ChatModeProps> = ({
       return;
     }
 
-    const hanzi = builderSequence.map(w => w.hanzi).join('');
-    const pinyin = builderSequence.map(w => w.label).join(' ');
-    const portuguese = getNaturalTranslation(builderSequence);
+    const isWoJiao = builderSequence.length >= 2 && 
+      builderSequence[builderSequence.length - 2].id === 'wo' && 
+      builderSequence[builderSequence.length - 1].id === 'jiao';
+
+    let hanzi = builderSequence.map(w => w.hanzi).join('');
+    let pinyin = builderSequence.map(w => w.label).join(' ');
+    let portuguese = getNaturalTranslation(builderSequence);
     const isValid = checkIsValidSentence(builderSequence);
+
+    // Se a frase termina com "wo jiao", colocar o nome do usuário na frente (Req 3)
+    if (isWoJiao) {
+      const activeName = senderName || auth.currentUser?.displayName || 'Estudante';
+      hanzi = `${hanzi} ${activeName}`;
+      pinyin = `${pinyin} ${activeName}`;
+      portuguese = `Eu me chamo ${activeName}.`;
+    }
 
     // CRITICAL: Word contains React Component icon (with symbols like Symbol(react.element)).
     // Serialize to pure primitive objects so Firestore never encounters a Symbol (Fix ID: 3029).
@@ -740,18 +814,41 @@ export const ChatMode: React.FC<ChatModeProps> = ({
           {/* Action Area: [Gerar sala] e [Campo de texto + Entrar] */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
             
-            {/* 1- Botão "Gerar sala" */}
-            <button
-              type="button"
-              id="btn-gerar-sala"
-              onClick={handleGenerateRoom}
-              disabled={isGenerating}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs hover:shadow-md disabled:opacity-50"
-              title="Gerar código aleatório e entrar em uma nova sala"
-            >
-              <Sparkles className="w-4 h-4 text-indigo-200" />
-              <span>{isGenerating ? 'Gerando...' : 'Gerar sala'}</span>
-            </button>
+            {/* 1- Botão "Gerar sala" com tema da cultura chinesa e limite de 10 salas (Req 2) */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="btn-gerar-sala"
+                onClick={handleGenerateRoom}
+                disabled={isGenerating || recentRooms.filter((r) => r.code !== 'ZH-GERAL').length >= 10}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  recentRooms.filter((r) => r.code !== 'ZH-GERAL').length >= 10
+                    ? 'Limite de 10 salas culturais atingido (10/10). Exclua uma sala para liberar espaço.'
+                    : 'Criar uma nova sala com tema da cultura chinesa (limite de 10 salas)'
+                }
+              >
+                <Sparkles className="w-4 h-4 text-indigo-200" />
+                <span>
+                  {isGenerating 
+                    ? 'Gerando...' 
+                    : recentRooms.filter((r) => r.code !== 'ZH-GERAL').length >= 10 
+                      ? 'Limite atingido (10/10)' 
+                      : 'Gerar sala'}
+                </span>
+              </button>
+
+              <span 
+                className={`text-[11px] font-bold px-2 py-1 rounded-xl border ${
+                  recentRooms.filter((r) => r.code !== 'ZH-GERAL').length >= 10
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                }`}
+                title="Total de salas culturais ativas / Limite máximo de 10 salas"
+              >
+                {recentRooms.filter((r) => r.code !== 'ZH-GERAL').length}/10
+              </span>
+            </div>
 
             {/* Separador vertical discreto em telas médias/grandes */}
             <div className="hidden sm:block w-px h-8 bg-slate-200" />
@@ -764,10 +861,10 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                   type="text"
                   id="input-codigo-sala"
                   value={roomInputText}
-                  onChange={(e) => setRoomInputText(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-                  placeholder="Código (ex: ZK7H9N4)"
-                  maxLength={20}
-                  className="w-40 sm:w-48 pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-mono font-bold uppercase tracking-wider focus:outline-indigo-500 placeholder:text-slate-400 placeholder:normal-case placeholder:font-normal transition-colors"
+                  onChange={(e) => setRoomInputText(e.target.value)}
+                  placeholder="Nome (ex: Dragão, Jade)"
+                  maxLength={30}
+                  className="w-44 sm:w-52 pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-semibold focus:outline-indigo-500 placeholder:text-slate-400 placeholder:font-normal transition-colors"
                 />
               </div>
 
@@ -776,7 +873,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                 id="btn-entrar-sala"
                 disabled={!roomInputText.trim()}
                 className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:cursor-not-allowed"
-                title="Entrar na sala com o código digitado"
+                title="Entrar na sala com o nome digitado"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Entrar</span>
@@ -800,7 +897,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
           <div className="flex items-start sm:items-center gap-1.5">
             <span className="font-bold text-slate-700 shrink-0">💡 Exemplo de uso:</span>
             <span>
-              Você clica em <strong>"Gerar sala"</strong> e obtém um código (ex: <code className="font-mono font-bold text-indigo-700 bg-slate-100 px-1 py-0.5 rounded">ZK7H9N4</code>). Outra pessoa digita <code className="font-mono font-bold text-indigo-700 bg-slate-100 px-1 py-0.5 rounded">ZK7H9N4</code> no campo e clica em <strong>"Entrar"</strong> para falarem juntos.
+              Ao clicar em <strong>"Gerar sala"</strong>, é criada uma sala inspirada na cultura chinesa (ex: <strong>Sala Dragão</strong>, <strong>Sala Panda</strong>, <strong>Sala Jade</strong> — máximo 10 salas). Na lista ao lado, são exibidos os <strong>nomes das salas</strong> no lugar dos códigos.
             </span>
           </div>
         </div>
@@ -840,9 +937,12 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold">Sala Aberta Geral</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
-                    ZH-GERAL
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-base shrink-0 leading-none">🌐</span>
+                    <span className="text-xs font-bold truncate">Sala Aberta Geral</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200 font-bold">
+                    Sala Aberta
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-500 mt-0.5">Comunidade aberta HSK 1-2</span>
@@ -873,10 +973,13 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1.5">
-                        <span className="text-xs font-bold truncate max-w-[110px]">{r.name}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-base shrink-0 leading-none">{r.icon || '🏮'}</span>
+                          <span className="text-xs font-bold truncate text-slate-900">{r.name}</span>
+                        </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 font-bold">
-                            {r.code}
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200 font-bold truncate max-w-[110px]">
+                            {r.name}
                           </span>
 
                           {/* Botão de lixeira na sala correspondente (Superusuário, Criador Google ou Sala Vazia) */}
@@ -1021,6 +1124,7 @@ export const ChatMode: React.FC<ChatModeProps> = ({
               validateAndBuildPhrase={validateAndBuildPhrase}
               onSendMessage={handleSendMessage}
               isSubmitting={isSubmitting}
+              userName={senderName || auth.currentUser?.displayName || 'Estudante'}
             />
           </div>
 
@@ -1031,8 +1135,8 @@ export const ChatMode: React.FC<ChatModeProps> = ({
             <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-indigo-600" />
-                <span className="text-xs font-bold text-slate-800">
-                  Mensagens da Sala <span className="font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">{currentRoomCode}</span>
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  Mensagens da <span className="font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg">{currentRoom?.name || currentRoomCode}</span>
                 </span>
                 <span className="text-[11px] text-slate-400">
                   ({messages.length} {messages.length === 1 ? 'frase' : 'frases'})

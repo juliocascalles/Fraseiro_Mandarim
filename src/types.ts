@@ -221,6 +221,7 @@ export interface ChatRoom {
   createdAt: string;
   lastActivity?: string;
   description?: string;
+  icon?: string;
 }
 
 export interface ChatPhraseWord {
