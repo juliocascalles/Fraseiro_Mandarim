@@ -17,6 +17,20 @@ export const PRACTICE_CHALLENGES: PracticeChallenge[] = [
     grammarNote: 'Forme a saudação básica "nǐ hǎo" e adicione a partícula de pergunta "ma" ao final.',
   },
   {
+    id: 'greet_ne_1',
+    portuguese: '...E você? / E quanto a você?',
+    contextHint: 'Pronome "ni" seguido da partícula de retorno "ne"',
+    targetPinyinList: [
+      'ni ne',
+    ],
+    targetHanzi: '你呢？',
+    targetHanziList: ['你呢'],
+    hskLevel: 'HSK 1',
+    category: 'greetings',
+    categoryName: 'Cumprimentos & Cortesia',
+    grammarNote: 'A partícula elíptica "ne" (呢) é usada após um pronome para devolver a pergunta ao interlocutor ("...e você?").',
+  },
+  {
     id: 'greet_2',
     portuguese: 'Eu estou muito bem.',
     contextHint: 'Use o advérbio "hen" antes do adjetivo',

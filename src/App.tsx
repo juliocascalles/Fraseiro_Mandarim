@@ -119,8 +119,9 @@ const WORDS: Word[] = [
   { id: 'zenmeyang', label: 'zenmeyang', hanzi: '怎么样', translation: 'como é...? / como está?', category: 'question', icon: HelpCircle, hskLevel: 'HSK 1' },
   { id: 'shei', label: 'shéi', hanzi: '谁', translation: 'quem', category: 'question', icon: HelpCircle, hskLevel: 'HSK 1' },
 
-  // Sentence-Final Particles (Invitations, Suggestions, Impressions)
+  // Sentence-Final Particles (Invitations, Suggestions, Impressions, Follow-up Questions)
   { id: 'ba_part', label: 'ba', hanzi: '吧', translation: 'vamos... / né? (sugestão)', category: 'particle', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'ne', label: 'ne', hanzi: '呢', translation: '...e? / e você? (pergunta)', category: 'particle', icon: HelpCircle, hskLevel: 'HSK 1' },
 
   // Countries
   { id: 'zhongguo', label: 'Zhōngguó', hanzi: '中国', translation: 'China (chinês)', category: 'country', icon: Globe, hskLevel: 'HSK 1' },
@@ -381,6 +382,21 @@ function getNaturalTranslation(seq: Word[]): string {
 
   const IDIOMS: Record<string, string> = {
     'ni hao': 'Olá! / Oi!',
+    'ni ne': '...E você?',
+    'nin ne': '...E o senhor / a senhora?',
+    'wo ne': '...E eu?',
+    'ta ne': '...E ele(a)?',
+    'ni men ne': '...E vocês?',
+    'wo men ne': '...E nós?',
+    'ta men ne': '...E eles(as)?',
+    'da jia ne': '...E todos vocês?',
+    'baba ne': '...E o papai? / Cadê o papai?',
+    'mama ne': '...E a mamãe? / Cadê a mamãe?',
+    'lao shi ne': '...E o professor(a)?',
+    'peng you ne': '...E o amigo(a)?',
+    'xue sheng ne': '...E os alunos?',
+    'wo hen hao ni ne': 'Eu estou muito bem, e você?',
+    'wo ye hen hao ni ne': 'Eu também estou muito bem, e você?',
     'nin hao': 'Olá! (formal / com respeito)',
     'ni men hao': 'Olá a todos! / Olá a vocês!',
     'da jia hao': 'Olá a todos!',
@@ -596,6 +612,12 @@ function checkIsValid(seq: Word[]): boolean {
   if (seq.length === 0) return false;
   const last = seq[seq.length - 1];
 
+  // If ending in sentence particle 'ne' (呢) - e.g. "ni ne", "ta ne", "wo ne", "nimen ne", "mama ne"
+  if (last.id === 'ne') {
+    if (seq.length <= 1) return false;
+    return true;
+  }
+
   // If ending in sentence particle 'ba_part' (吧)
   if (last.id === 'ba_part') {
     if (seq.length <= 1) return false;
@@ -716,8 +738,8 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     const verbExists = sequence.some(w => w.category === 'verb');
     const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji', 'duoda', 'weishenme'].includes(w.id));
 
-    // Case: Particle ba_part is sentence-final
-    if (last.id === 'ba_part') {
+    // Case: Particle ba_part or ne is sentence-final
+    if (last.id === 'ba_part' || last.id === 'ne') {
       return [];
     }
 
@@ -810,7 +832,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.category === 'family') return true;
           if (w.id === 'nar' || w.id === 'nali_there') return true;
           if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-          if (w.id === 'ba_part') return true;
+          if (w.id === 'ba_part' || w.id === 'ne') return true;
           return false;
         });
       } else {
@@ -827,6 +849,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.id === 'xiang') return true; // Want/think
           if (w.category === 'number') return true; // ex: wo liang sui
           if (w.category === 'preposition') return true; // ex: wo gei ...
+          if (w.id === 'ne') return true; // Permite 'ne' após 'ni' (...E você?), 'wo ne', 'ta ne', etc.
           if (['zhe', 'na_dem'].includes(last.id)) {
             if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun' || w.id === 'duoshao') return true;
           }
@@ -848,7 +871,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.category === 'verb') return true; // ex: you_verb, shi, zai
           if (w.category === 'adverb') return true; // ex: hen, dou, ye, bu
           if (w.category === 'possessive') return true; // ex: jia de...
-          if (['zenmeyang', 'duoshao'].includes(w.id)) return true;
+          if (['zenmeyang', 'duoshao', 'ne'].includes(w.id)) return true;
           return false;
         });
       }
@@ -859,7 +882,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.category === 'plural' || w.category === 'possessive') return true;
           if (w.id === 'cai') return true; // e.g. wo xiang wo mama de cai -> de -> cai
           if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-          if (w.id === 'ba_part') return true;
+          if (w.id === 'ba_part' || w.id === 'ne') return true;
           return false;
         });
       }
@@ -870,6 +893,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         if (['adverb', 'verb', 'adjective', 'preposition'].includes(w.category)) return true;
         if (['zenmeyang', 'duoda', 'ji'].includes(w.id)) return true;
         if (w.category === 'number') return true; // ex: wo nver liang sui
+        if (w.id === 'ne') return true; // e.g. mama ne?
         return false;
       });
     }
@@ -880,11 +904,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => {
           if (w.category === 'possessive') return true;
           if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
-          if (w.id === 'ba_part') return true;
+          if (w.id === 'ba_part' || w.id === 'ne') return true;
           return false;
         });
       } else {
-        return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category) || ['qu_verb'].includes(w.id));
+        return WORDS.filter(w => ['possessive', 'adverb', 'verb', 'adjective', 'preposition'].includes(w.category) || ['qu_verb', 'ne'].includes(w.id));
       }
     }
 
@@ -1245,7 +1269,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => ['adverb', 'verb', 'adjective', 'question', 'possessive'].includes(w.category));
       }
 
-      // Questions are final, but can have 'ma' or 'ba_part' if applicable
+      // Questions are final, but can have 'ma', 'ba_part', or 'ne' if applicable
       const allowedEndings: Word[] = [];
       if (!hasQuestion && !sequence.some(w => w.id === 'ma')) {
         const maW = WORDS.find(w => w.id === 'ma');
@@ -1254,6 +1278,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       if (!hasQuestion && !sequence.some(w => w.id === 'ba_part')) {
         const baW = WORDS.find(w => w.id === 'ba_part');
         if (baW) allowedEndings.push(baW);
+      }
+      if (!hasQuestion && !sequence.some(w => w.id === 'ne')) {
+        const neW = WORDS.find(w => w.id === 'ne');
+        if (neW) allowedEndings.push(neW);
       }
 
       return allowedEndings;
@@ -1265,11 +1293,12 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
   const baseWords = getBaseWords();
   let finalWords = [...baseWords];
 
-  // Leave question particle 'ma' and suggestion particle 'ba_part' available after complete sentence is formed
+  // Leave question particle 'ma', suggestion particle 'ba_part', and follow-up 'ne' available after complete sentence is formed
   if (checkIsValid(sequence)) {
     const hasQuestion = sequence.some(w => ['na', 'shenme', 'duoshao', 'nali', 'zenmeyang', 'shei', 'ji', 'duoda'].includes(w.id));
     const hasMa = sequence.some(w => w.id === 'ma');
     const hasBa = sequence.some(w => w.id === 'ba_part');
+    const hasNe = sequence.some(w => w.id === 'ne');
     if (!hasQuestion && !hasMa) {
       const maWord = WORDS.find(w => w.id === 'ma');
       if (maWord && !finalWords.some(w => w.id === 'ma')) {
@@ -1280,6 +1309,12 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       const baWord = WORDS.find(w => w.id === 'ba_part');
       if (baWord && !finalWords.some(w => w.id === 'ba_part')) {
         finalWords.push(baWord);
+      }
+    }
+    if (!hasQuestion && !hasNe) {
+      const neWord = WORDS.find(w => w.id === 'ne');
+      if (neWord && !finalWords.some(w => w.id === 'ne')) {
+        finalWords.push(neWord);
       }
     }
   }
@@ -1721,6 +1756,26 @@ function tokenizePhraseInput(input: string): string[] {
     }
     if (norm === 'nihao') {
       tokens.push('ni', 'hao');
+      i++;
+      continue;
+    }
+    if (norm === 'nine') {
+      tokens.push('ni', 'ne');
+      i++;
+      continue;
+    }
+    if (norm === 'ninne') {
+      tokens.push('nin', 'ne');
+      i++;
+      continue;
+    }
+    if (norm === 'wone') {
+      tokens.push('wo', 'ne');
+      i++;
+      continue;
+    }
+    if (norm === 'tane') {
+      tokens.push('ta', 'ne');
       i++;
       continue;
     }
