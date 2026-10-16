@@ -266,7 +266,7 @@ const WORDS: Word[] = [
   { id: 'shi_num', label: 'shí', hanzi: '十', translation: '10 / dezena', category: 'number', icon: Type, hskLevel: 'HSK 1' },
   { id: 'bai', label: 'bǎi', hanzi: '百', translation: '100 / centena', category: 'number', icon: Type, hskLevel: 'HSK 1' },
   { id: 'qian_num', label: 'qiān', hanzi: '千', translation: '1.000 / milhar', category: 'number', icon: Type, hskLevel: 'HSK 2' },
-  { id: 'wan', label: 'wàn', hanzi: '万', translation: '10.000 / dezena de milhar', category: 'number', icon: Type, hskLevel: 'HSK 2' },
+  { id: 'wan_num', label: 'wàn', hanzi: '万', translation: '10.000 / dezena de milhar', category: 'number', icon: Type, hskLevel: 'HSK 2' },
 
   // Etiquette
   { id: 'qing', label: 'qing', hanzi: '请', translation: 'por favor', category: 'etiquette', icon: UserCheck, hskLevel: 'HSK 1' },
@@ -521,6 +521,7 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'ta_female') return 'ta';
     if (w.id === 'shi_num') return 'shi';
     if (w.id === 'qian_num') return 'qian';
+    if (w.id === 'wan_num') return 'wan';
     if (w.id === 'wan') return 'wan';
     if (w.id === 'ge_class') return 'ge';
     if (w.id === 'na_dem') return 'na';
