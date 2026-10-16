@@ -11,6 +11,8 @@ import { GrammarTipBalloon } from './GrammarTipBalloon';
 import { speakMandarin } from '../utils/speech';
 import { generateGrammarOrderTip } from '../utils/grammarTips';
 
+type QuizTypeFilter = 'ALL' | 'fill_blank' | 'order_words' | 'false_friends' | 'hanzi_recognition';
+
 interface QuizModeProps {
   allWords: Word[];
   validateAndBuildPhrase: (input: string) => PhraseValidationReport;
@@ -24,8 +26,9 @@ export const QuizMode: React.FC<QuizModeProps> = ({
 }) => {
   // Filters & Game Configuration
   const [hskFilter, setHskFilter] = useState<HskLevel | 'ALL'>('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'fill_blank' | 'order_words'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<QuizTypeFilter>('ALL');
   const [gameMode, setGameMode] = useState<'round10' | 'endless'>('round10');
+  const [hidePinyinInOptions, setHidePinyinInOptions] = useState<boolean>(false);
 
   // Stats & Progress
   const [score, setScore] = useState<number>(0);
@@ -319,22 +322,26 @@ export const QuizMode: React.FC<QuizModeProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/70 text-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-bold text-slate-500 text-[11px] uppercase mr-1">Formato:</span>
-          {(['ALL', 'fill_blank', 'order_words'] as const).map(type => (
+          {([
+            { id: 'ALL', label: '🎲 Misto' },
+            { id: 'fill_blank', label: '🧩 Lacunas' },
+            { id: 'order_words', label: '🔀 Ordenar' },
+            { id: 'false_friends', label: '⚠️ Não Confundir' },
+            { id: 'hanzi_recognition', label: '🀄 Hanzi Puro' },
+          ] as const).map(item => (
             <button
-              key={type}
+              key={item.id}
               onClick={() => {
-                setTypeFilter(type);
-                drawNewQuestion(hskFilter, type);
+                setTypeFilter(item.id);
+                drawNewQuestion(hskFilter, item.id);
               }}
-              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
-                typeFilter === type
+              className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                typeFilter === item.id
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
               }`}
             >
-              {type === 'ALL' && '🎲 Misto'}
-              {type === 'fill_blank' && '🧩 Preencher Lacuna'}
-              {type === 'order_words' && '🔀 Ordenar Frase'}
+              {item.label}
             </button>
           ))}
         </div>
@@ -358,9 +365,22 @@ export const QuizMode: React.FC<QuizModeProps> = ({
             </button>
           ))}
 
+          {/* Toggle for pure Hanzi mode on all options */}
+          <button
+            onClick={() => setHidePinyinInOptions(prev => !prev)}
+            className={`px-2.5 py-1 rounded-xl font-bold border transition-all cursor-pointer ${
+              hidePinyinInOptions
+                ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                : 'bg-white hover:bg-amber-50 text-amber-800 border-amber-300'
+            }`}
+            title="Alternativas para identificar hanzis (sem pinyin ou tradução antes de responder)"
+          >
+            {hidePinyinInOptions ? '🀄 Modo Hanzi Puro: ATIVO' : '🀄 Ocultar Pinyin nas Opções'}
+          </button>
+
           <button
             onClick={() => setGameMode(prev => prev === 'round10' ? 'endless' : 'round10')}
-            className="ml-2 px-2.5 py-1 rounded-xl font-bold bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 cursor-pointer"
+            className="ml-1 px-2.5 py-1 rounded-xl font-bold bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 cursor-pointer"
             title="Alternar entre rodada de 10 perguntas e modo infinito"
           >
             {gameMode === 'round10' ? '🏆 10 Perguntas' : '♾️ Infinito'}
@@ -467,10 +487,29 @@ export const QuizMode: React.FC<QuizModeProps> = ({
               </h3>
             </div>
 
-            {/* QUESTION TYPE 1: FILL IN THE BLANK (Preencher Lacuna) */}
-            {currentQuestion.type === 'fill_blank' && (
+            {/* QUESTION TYPE 1: FILL IN THE BLANK, FALSE FRIENDS & HANZI RECOGNITION */}
+            {(currentQuestion.type === 'fill_blank' || currentQuestion.type === 'false_friends' || currentQuestion.type === 'hanzi_recognition') && (
               <div className="flex flex-col gap-6">
-                {/* Sentence Banner with Blank Slot */}
+                {/* Specific Mode Badges */}
+                {currentQuestion.type === 'false_friends' && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-semibold">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Atenção aos Falsos Cognatos & Homófonos:</strong> Cuidado com ideogramas ou pinyins semelhantes que possuem significados e funções gramaticais completamente diferentes!
+                    </span>
+                  </div>
+                )}
+
+                {currentQuestion.type === 'hanzi_recognition' && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-rose-50 border border-rose-200/80 text-rose-900 text-xs font-semibold">
+                    <Sparkles className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>
+                      <strong>Treino Visual de Hanzi Puro:</strong> As alternativas exibem apenas os ideogramas sem pinyin ou tradução inicial. Reconheça o caractere correto pela sua forma visual!
+                    </span>
+                  </div>
+                )}
+
+                {/* Sentence Banner with Blank Slot / Prompt */}
                 <div className="p-6 md:p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/40 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-3">
                   <div className="flex flex-wrap items-center justify-center gap-2 text-2xl md:text-3xl font-extrabold text-slate-900 tracking-wide font-sans">
                     {currentQuestion.prefixHanzi && (
@@ -478,21 +517,23 @@ export const QuizMode: React.FC<QuizModeProps> = ({
                     )}
 
                     {/* The Interactive Blank Slot */}
-                    <span
-                      className={`inline-flex items-center justify-center px-4 py-1.5 rounded-xl border-2 transition-all min-w-[70px] ${
-                        isAnswered
-                          ? isCorrect
-                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-md'
-                            : 'bg-rose-500 text-white border-rose-600 shadow-md'
-                          : 'bg-white border-indigo-400 text-indigo-600 shadow-inner border-dashed animate-pulse'
-                      }`}
-                    >
-                      {isAnswered ? (
-                        currentQuestion.options?.find(o => o.id === selectedOptionId)?.hanzi || '?'
-                      ) : (
-                        <span className="text-sm font-bold text-indigo-400">?</span>
-                      )}
-                    </span>
+                    {currentQuestion.type !== 'hanzi_recognition' && (
+                      <span
+                        className={`inline-flex items-center justify-center px-4 py-1.5 rounded-xl border-2 transition-all min-w-[70px] ${
+                          isAnswered
+                            ? isCorrect
+                              ? 'bg-emerald-500 text-white border-emerald-600 shadow-md'
+                              : 'bg-rose-500 text-white border-rose-600 shadow-md'
+                            : 'bg-white border-indigo-400 text-indigo-600 shadow-inner border-dashed animate-pulse'
+                        }`}
+                      >
+                        {isAnswered ? (
+                          currentQuestion.options?.find(o => o.id === selectedOptionId)?.hanzi || '?'
+                        ) : (
+                          <span className="text-sm font-bold text-indigo-400">?</span>
+                        )}
+                      </span>
+                    )}
 
                     {currentQuestion.suffixHanzi && (
                       <span>{currentQuestion.suffixHanzi}</span>
@@ -523,6 +564,7 @@ export const QuizMode: React.FC<QuizModeProps> = ({
                   {currentQuestion.options?.map(option => {
                     const isSelected = selectedOptionId === option.id;
                     const isTheCorrectOption = option.isCorrect;
+                    const isPureHanziView = (hidePinyinInOptions || currentQuestion.isHanziOnly) && !isAnswered;
 
                     let buttonStyle = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 hover:border-indigo-300 hover:shadow-xs';
 
@@ -546,16 +588,25 @@ export const QuizMode: React.FC<QuizModeProps> = ({
                         className={`flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${buttonStyle}`}
                       >
                         <div className="flex items-center gap-3.5">
-                          <span className="text-xl md:text-2xl font-bold font-sans">
+                          <span className={`${isPureHanziView ? 'text-3xl sm:text-4xl py-1' : 'text-xl md:text-2xl'} font-bold font-sans tracking-wide text-slate-900`}>
                             {option.hanzi}
                           </span>
+
                           <div className="flex flex-col">
-                            <span className="font-mono text-xs font-bold opacity-80">
-                              {option.pinyin}
-                            </span>
-                            <span className="text-xs opacity-75 truncate max-w-[170px] sm:max-w-[210px]">
-                              {option.translation}
-                            </span>
+                            {isPureHanziView ? (
+                              <span className="text-[10px] font-extrabold text-amber-700/70 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/50 uppercase tracking-widest">
+                                Hanzi Puro
+                              </span>
+                            ) : (
+                              <>
+                                <span className="font-mono text-xs font-bold opacity-80">
+                                  {option.pinyin}
+                                </span>
+                                <span className="text-xs opacity-75 truncate max-w-[170px] sm:max-w-[210px]">
+                                  {option.translation}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
 

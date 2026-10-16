@@ -14,7 +14,7 @@ import {
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
-  Hash, LogOut
+  Hash, LogOut, Flame, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -25,6 +25,7 @@ import { ChatMode } from './components/ChatMode';
 import { HanziCanvasMode } from './components/HanziCanvasMode';
 import { GoogleLoginGate } from './components/GoogleLoginGate';
 import { ChineseNumbersModal } from './components/ChineseNumbersModal';
+import { FalseFriendsModal } from './components/FalseFriendsModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
@@ -54,23 +55,30 @@ const WORDS: Word[] = [
   { id: 'ye', label: 'yê', hanzi: '也', translation: 'também (antes do verbo)', category: 'adverb', icon: RefreshCcw, hskLevel: 'HSK 2' },
   { id: 'bu', label: 'bù', hanzi: '不', translation: 'não (presente/futuro)', category: 'adverb', icon: XCircle, hskLevel: 'HSK 1' },
   { id: 'mei', label: 'méi', hanzi: '没', translation: 'não (ter/passado)', category: 'adverb', icon: XCircle, hskLevel: 'HSK 1' },
-  { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas', category: 'adverb', icon: Target, hskLevel: 'HSK 2' },
+  { id: 'zhi', label: 'zhi', hanzi: '只', translation: 'apenas / somente', category: 'adverb', icon: Target, hskLevel: 'HSK 2' },
   { id: 'hen', label: 'hen', hanzi: '很', translation: 'muito', category: 'adverb', icon: PlusSquare, hskLevel: 'HSK 1' },
   { id: 'henduo', label: 'hěnduō', hanzi: '很多', translation: 'muitos / bastante', category: 'adverb', icon: PlusSquare, hskLevel: 'HSK 1' },
   { id: 'henshao', label: 'hěnshǎo', hanzi: '很少', translation: 'poucos / raro', category: 'adverb', icon: Target, hskLevel: 'HSK 2' },
   { id: 'dagai', label: 'dàgài', hanzi: '大概', translation: 'aproximadamente / provável', category: 'adverb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'yidian', label: 'yìdiǎn', hanzi: '一点', translation: 'um pouco', category: 'adverb', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'bijiao', label: 'bǐjiào', hanzi: '比较', translation: 'relativamente / comparativamente', category: 'adverb', icon: Layers, hskLevel: 'HSK 2' },
+  { id: 'zhen', label: 'zhēn', hanzi: '真', translation: 'realmente / de verdade', category: 'adverb', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'feichang', label: 'fēicháng', hanzi: '非常', translation: 'extremamente / extraordinariamente', category: 'adverb', icon: Flame, hskLevel: 'HSK 2' },
+  { id: 'yixia', label: 'yíxià', hanzi: '一下', translation: 'um pouquinho / uma olhadinha', category: 'adverb', icon: Sparkles, hskLevel: 'HSK 2' },
   
   // Prepositions
-  { id: 'gei', label: 'gei', hanzi: '给', translation: 'para', category: 'preposition', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'gei', label: 'gei', hanzi: '给', translation: 'para / dar', category: 'preposition', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'bi_comp', label: 'bǐ', hanzi: '比', translation: 'em comparação a / mais do que', category: 'preposition', icon: ArrowRight, hskLevel: 'HSK 2' },
 
   // Conjunctions
   { id: 'he_conj', label: 'he', hanzi: '和', translation: 'e', category: 'conjunction', icon: PlusSquare, hskLevel: 'HSK 2' },
   { id: 'yinwei', label: 'yīnwèi', hanzi: '因为', translation: 'porque / pois (resposta)', category: 'conjunction', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'haishi', label: 'háishì', hanzi: '还是', translation: 'ou (em perguntas de escolha)', category: 'conjunction', icon: HelpCircle, hskLevel: 'HSK 2' },
 
   // Verbs & Auxiliary/Modal Verbs
   { id: 'shi', label: 'shi', hanzi: '是', translation: 'ser', category: 'verb', icon: UserCheck, hskLevel: 'HSK 1' },
   { id: 'you_verb', label: 'you', hanzi: '有', translation: 'ter/haver', category: 'verb', icon: PlusSquare, hskLevel: 'HSK 1' },
+  { id: 'yao_verb', label: 'yào', hanzi: '要', translation: 'querer / precisar / vou...', category: 'verb', icon: Target, hskLevel: 'HSK 1' },
   { id: 'qu_verb', label: 'qù', hanzi: '去', translation: 'ir', category: 'verb', icon: ArrowRight, hskLevel: 'HSK 1' },
   { id: 'shuo', label: 'shuo', hanzi: '说', translation: 'falar', category: 'verb', icon: MessageSquare, hskLevel: 'HSK 1' },
   { id: 'jiao', label: 'jiao', hanzi: '叫', translation: 'chamar-se', category: 'verb', icon: Tag, hskLevel: 'HSK 1' },
@@ -82,12 +90,24 @@ const WORDS: Word[] = [
   { id: 'keyi', label: 'ke yi', hanzi: '可以', translation: 'poder (permissão)', category: 'verb', icon: UserCheck, hskLevel: 'HSK 2' },
   { id: 'hui', label: 'huì', hanzi: '会', translation: 'poder/saber (habilidade adquirida)', category: 'verb', icon: Award, hskLevel: 'HSK 1' },
   { id: 'da_call', label: 'da', hanzi: '打', translation: 'ligar', category: 'verb', icon: MessageSquare, hskLevel: 'HSK 2' },
+  { id: 'da_sport', label: 'dǎ', hanzi: '打', translation: 'jogar (bola com mãos) / bater', category: 'verb', icon: Target, hskLevel: 'HSK 1' },
   { id: 'fa_verb', label: 'fa', hanzi: '发', translation: 'enviar', category: 'verb', icon: PlusSquare, hskLevel: 'HSK 2' },
-  { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber/conhecer', category: 'verb', icon: FileText, hskLevel: 'HSK 1' },
+  { id: 'zhidao', label: 'zhidao', hanzi: '知道', translation: 'saber (fatos / informação)', category: 'verb', icon: FileText, hskLevel: 'HSK 1' },
+  { id: 'renshi', label: 'rènshi', hanzi: '认识', translation: 'conhecer / encontrar-se (pessoas)', category: 'verb', icon: Users, hskLevel: 'HSK 1' },
   { id: 'zuo', label: 'zuo', hanzi: '坐', translation: 'sentar', category: 'verb', icon: UserCheck, hskLevel: 'HSK 1' },
   { id: 'he', label: 'hé', hanzi: '喝', translation: 'beber', category: 'verb', icon: Coffee, hskLevel: 'HSK 1' },
   { id: 'chi', label: 'chī', hanzi: '吃', translation: 'comer', category: 'verb', icon: Utensils, hskLevel: 'HSK 1' },
+  { id: 'chifan', label: 'chīfàn', hanzi: '吃饭', translation: 'comer / fazer refeição', category: 'verb', icon: Utensils, hskLevel: 'HSK 1' },
   { id: 'jin', label: 'jin', hanzi: '进', translation: 'entrar', category: 'verb', icon: ArrowRight, hskLevel: 'HSK 2' },
+  { id: 'gan', label: 'gàn', hanzi: '干', translation: 'fazer / realizar (ação direta)', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'mai', label: 'mǎi', hanzi: '买', translation: 'comprar', category: 'verb', icon: Coins, hskLevel: 'HSK 1' },
+  { id: 'yong_verb', label: 'yòng', hanzi: '用', translation: 'usar / utilizar / por meio de', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'xie', label: 'xiě', hanzi: '写', translation: 'escrever', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
+  { id: 'xiezi', label: 'xiězì', hanzi: '写字', translation: 'escrever ideogramas', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
+  { id: 'wan', label: 'wán', hanzi: '玩', translation: 'brincar / jogar / curtir', category: 'verb', icon: Smile, hskLevel: 'HSK 2' },
+  { id: 'paobu', label: 'pǎobù', hanzi: '跑步', translation: 'correr / corrida', category: 'verb', icon: Play, hskLevel: 'HSK 2' },
+  { id: 'youyong_swim', label: 'yóuyǒng', hanzi: '游泳', translation: 'nadar / natação (esporte)', category: 'verb', icon: Droplets, hskLevel: 'HSK 2' },
+  { id: 'xing', label: 'xíng', hanzi: '行', translation: 'ok / tudo bem / aceitável', category: 'verb', icon: CheckCircle2, hskLevel: 'HSK 2' },
 
   // Family & Home
   { id: 'jia', label: 'jia', hanzi: '家', translation: 'casa/família', category: 'family', icon: Home, hskLevel: 'HSK 1' },
@@ -103,8 +123,12 @@ const WORDS: Word[] = [
   { id: 'erzi', label: 'érzi', hanzi: '儿子', translation: 'filho', category: 'family', icon: Smile, hskLevel: 'HSK 1' },
 
   // Classifiers / Measure Words & Age Markers
-  { id: 'kou', label: 'kou', hanzi: '口', translation: 'boca (membros)', category: 'classifier', icon: MessageSquare, hskLevel: 'HSK 1' },
-  { id: 'ge_class', label: 'ge', hanzi: '个', translation: 'unidade (classif.)', category: 'classifier', icon: Tag, hskLevel: 'HSK 1' },
+  { id: 'kou', label: 'kou', hanzi: '口', translation: 'boca (membros de família)', category: 'classifier', icon: MessageSquare, hskLevel: 'HSK 1' },
+  { id: 'ge_class', label: 'ge', hanzi: '个', translation: 'unidade (classif. geral)', category: 'classifier', icon: Tag, hskLevel: 'HSK 1' },
+  { id: 'ben', label: 'běn', hanzi: '本', translation: 'livro / volume (classif.)', category: 'classifier', icon: Book, hskLevel: 'HSK 1' },
+  { id: 'zhi_class', label: 'zhī', hanzi: '支', translation: 'caneta / haste (classif.)', category: 'classifier', icon: PenTool, hskLevel: 'HSK 1' },
+  { id: 'zhang', label: 'zhāng', hanzi: '张', translation: 'folha / mapa / superfície plana (classif.)', category: 'classifier', icon: FileText, hskLevel: 'HSK 1' },
+  { id: 'bei', label: 'bēi', hanzi: '杯', translation: 'copo / xícara (classif.)', category: 'classifier', icon: Coffee, hskLevel: 'HSK 1' },
   { id: 'sui', label: 'suì', hanzi: '岁', translation: 'anos de idade', category: 'classifier', icon: Tag, hskLevel: 'HSK 1' },
 
   // Questions
@@ -119,9 +143,10 @@ const WORDS: Word[] = [
   { id: 'zenmeyang', label: 'zenmeyang', hanzi: '怎么样', translation: 'como é...? / como está?', category: 'question', icon: HelpCircle, hskLevel: 'HSK 1' },
   { id: 'shei', label: 'shéi', hanzi: '谁', translation: 'quem', category: 'question', icon: HelpCircle, hskLevel: 'HSK 1' },
 
-  // Sentence-Final Particles (Invitations, Suggestions, Impressions, Follow-up Questions)
+  // Sentence-Final Particles (Invitations, Suggestions, Impressions, Follow-up Questions, Completion)
   { id: 'ba_part', label: 'ba', hanzi: '吧', translation: 'vamos... / né? (sugestão)', category: 'particle', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'ne', label: 'ne', hanzi: '呢', translation: '...e? / e você? (pergunta)', category: 'particle', icon: HelpCircle, hskLevel: 'HSK 1' },
+  { id: 'le', label: 'le', hanzi: '了', translation: 'já / completou (aspecto)', category: 'particle', icon: CheckCircle2, hskLevel: 'HSK 1' },
 
   // Countries
   { id: 'zhongguo', label: 'Zhōngguó', hanzi: '中国', translation: 'China (chinês)', category: 'country', icon: Globe, hskLevel: 'HSK 1' },
@@ -138,12 +163,20 @@ const WORDS: Word[] = [
 
   // Nouns
   { id: 'jintian', label: 'jīntiān', hanzi: '今天', translation: 'hoje', category: 'noun', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'zuotian', label: 'zuótiān', hanzi: '昨天', translation: 'ontem', category: 'noun', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'mingtian', label: 'míngtiān', hanzi: '明天', translation: 'amanhã', category: 'noun', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'meitian', label: 'měitiān', hanzi: '每天', translation: 'todo dia / diariamente', category: 'noun', icon: Sun, hskLevel: 'HSK 2' },
   { id: 'yutian', label: 'yǔtiān', hanzi: '雨天', translation: 'dia chuvoso', category: 'noun', icon: Droplets, hskLevel: 'HSK 2' },
   { id: 'qingtian', label: 'qíngtiān', hanzi: '晴天', translation: 'dia ensolarado', category: 'noun', icon: Sun, hskLevel: 'HSK 2' },
+  { id: 'yintian', label: 'yīntiān', hanzi: '阴天', translation: 'dia nublado', category: 'noun', icon: Droplets, hskLevel: 'HSK 2' },
+  { id: 'yu_weather', label: 'yǔ', hanzi: '雨', translation: 'chuva', category: 'noun', icon: Droplets, hskLevel: 'HSK 1' },
   { id: 'gongsi', label: 'gōngsī', hanzi: '公司', translation: 'empresa / companhia', category: 'noun', icon: Briefcase, hskLevel: 'HSK 2' },
   { id: 'nar', label: 'nàr', hanzi: '那儿', translation: 'lá / ali', category: 'noun', icon: Compass, hskLevel: 'HSK 2' },
   { id: 'nali_there', label: 'nàli', hanzi: '那里', translation: 'lá / ali (sul)', category: 'noun', icon: Compass, hskLevel: 'HSK 2' },
-  { id: 'hanyu', label: 'Hanyu', hanzi: '汉语', translation: 'mandarim (língua)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
+  { id: 'hanyu', label: 'Hanyu', hanzi: '汉语', translation: 'mandarim (língua falada)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
+  { id: 'zhongwen', label: 'Zhōngwén', hanzi: '中文', translation: 'chinês (língua escrita/geral)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
+  { id: 'yingwen', label: 'Yīngwén', hanzi: '英文', translation: 'inglês (língua)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
+  { id: 'puwen', label: 'Púwén', hanzi: '葡文', translation: 'português (língua portuguesa)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 2' },
   { id: 'zaoshang', label: 'zǎoshang', hanzi: '早上', translation: 'manhã (cedo / bom dia)', category: 'noun', icon: Sun, hskLevel: 'HSK 2' },
   { id: 'difang', label: 'dìfang', hanzi: '地方', translation: 'lugar / localidade', category: 'noun', icon: Globe, hskLevel: 'HSK 2' },
   { id: 'chaoshi', label: 'chāoshì', hanzi: '超市', translation: 'supermercado', category: 'noun', icon: Briefcase, hskLevel: 'HSK 2' },
@@ -161,6 +194,15 @@ const WORDS: Word[] = [
   { id: 'xuexiao', label: 'xuexiao', hanzi: '学校', translation: 'escola', category: 'noun', icon: Book, hskLevel: 'HSK 1' },
   { id: 'daxue', label: 'daxue', hanzi: '大学', translation: 'universidade', category: 'noun', icon: GraduationCap, hskLevel: 'HSK 1' },
   { id: 'Huawei', label: 'Huawei', hanzi: '华为', translation: 'Huawei', category: 'noun', icon: Briefcase, hskLevel: 'HSK 2' },
+  { id: 'ci', label: 'cí', hanzi: '词', translation: 'palavra / vocábulo', category: 'noun', icon: Type, hskLevel: 'HSK 2' },
+  { id: 'dianying', label: 'diànyǐng', hanzi: '电影', translation: 'filme', category: 'noun', icon: Play, hskLevel: 'HSK 1' },
+  { id: 'ke', label: 'kè', hanzi: '课', translation: 'aula / lição', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
+  { id: 'yisi', label: 'yìsi', hanzi: '意思', translation: 'significado / intenção / sentido', category: 'noun', icon: Type, hskLevel: 'HSK 1' },
+  { id: 'zuqiu', label: 'zúqiú', hanzi: '足球', translation: 'futebol', category: 'noun', icon: Target, hskLevel: 'HSK 1' },
+  { id: 'lanqiu', label: 'lánqiú', hanzi: '篮球', translation: 'basquete', category: 'noun', icon: Target, hskLevel: 'HSK 1' },
+  { id: 'wangqiu', label: 'wǎngqiú', hanzi: '网球', translation: 'tênis', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
+  { id: 'bangqiu', label: 'bàngqiú', hanzi: '棒球', translation: 'beisebol', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
+  { id: 'pingpangqiu', label: 'pīngpāngqiú', hanzi: '乒乓球', translation: 'ping-pong / tênis de mesa', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
 
   // Things (Coisas)
   { id: 'shu', label: 'shu', hanzi: '书', translation: 'livro', category: 'thing', icon: Book, hskLevel: 'HSK 1' },
@@ -174,6 +216,15 @@ const WORDS: Word[] = [
   { id: 'mianbao', label: 'mianbao', hanzi: '面包', translation: 'pão', category: 'thing', icon: Milk, hskLevel: 'HSK 2' },
   { id: 'tang', label: 'tang', hanzi: '汤', translation: 'sopa', category: 'thing', icon: Soup, hskLevel: 'HSK 2' },
   { id: 'qian', label: 'qián', hanzi: '钱', translation: 'dinheiro (preço)', category: 'thing', icon: Coins, hskLevel: 'HSK 2' },
+  { id: 'ditu', label: 'dìtú', hanzi: '地图', translation: 'mapa', category: 'thing', icon: Compass, hskLevel: 'HSK 2' },
+  { id: 'bi', label: 'bǐ', hanzi: '笔', translation: 'caneta / instrumento de escrita', category: 'thing', icon: PenTool, hskLevel: 'HSK 1' },
+  { id: 'gangbi', label: 'gāngbǐ', hanzi: '钢笔', translation: 'caneta-tinteiro / caneta', category: 'thing', icon: PenTool, hskLevel: 'HSK 2' },
+  { id: 'shouji', label: 'shǒujī', hanzi: '手机', translation: 'celular', category: 'thing', icon: MessageSquare, hskLevel: 'HSK 2' },
+  { id: 'kuaizi', label: 'kuàizi', hanzi: '筷子', translation: 'pauzinhos / hashis', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
+  { id: 'dangao', label: 'dàngāo', hanzi: '蛋糕', translation: 'bolo', category: 'thing', icon: Heart, hskLevel: 'HSK 2' },
+  { id: 'jiaozi', label: 'jiǎozi', hanzi: '饺子', translation: 'bolinhos chineses / guiozas', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
+  { id: 'kele', label: 'kělè', hanzi: '可乐', translation: 'Coca-Cola / refrigerante', category: 'thing', icon: CupSoda, hskLevel: 'HSK 2' },
+  { id: 'qiu', label: 'qiú', hanzi: '球', translation: 'bola / esportes com bola', category: 'thing', icon: Target, hskLevel: 'HSK 1' },
 
   // Adjectives
   { id: 'hao', label: 'hǎo', hanzi: '好', translation: 'bom / bem (olá)', category: 'adjective', icon: Smile, hskLevel: 'HSK 1' },
@@ -188,6 +239,16 @@ const WORDS: Word[] = [
   { id: 'congming', label: 'congming', hanzi: '聪明', translation: 'inteligente', category: 'adjective', icon: GraduationCap, hskLevel: 'HSK 2' },
   { id: 'piaoliang', label: 'piaoliang', hanzi: '漂亮', translation: 'bonito(a)', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
   { id: 'shuai', label: 'shuai', hanzi: '帅', translation: 'bonito (homem)', category: 'adjective', icon: User, hskLevel: 'HSK 2' },
+  { id: 'heise', label: 'hēisè', hanzi: '黑色', translation: 'cor preta / preto', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'gao', label: 'gāo', hanzi: '高', translation: 'alto', category: 'adjective', icon: Tag, hskLevel: 'HSK 1' },
+  { id: 're', label: 'rè', hanzi: '热', translation: 'quente', category: 'adjective', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'leng', label: 'lěng', hanzi: '冷', translation: 'frio', category: 'adjective', icon: Droplets, hskLevel: 'HSK 1' },
+  { id: 'haochi', label: 'hǎochī', hanzi: '好吃', translation: 'gostoso / delicioso (comida)', category: 'adjective', icon: Smile, hskLevel: 'HSK 1' },
+  { id: 'haohe', label: 'hǎohē', hanzi: '好喝', translation: 'gostoso de beber / saboroso (bebida)', category: 'adjective', icon: Coffee, hskLevel: 'HSK 1' },
+  { id: 'youyisi', label: 'yǒu yìsi', hanzi: '有意思', translation: 'interessante / divertido', category: 'adjective', icon: Sparkles, hskLevel: 'HSK 1' },
+  { id: 'meiyisi', label: 'méi yìsi', hanzi: '没有意思', translation: 'chato / sem graça', category: 'adjective', icon: AlertCircle, hskLevel: 'HSK 1' },
+  { id: 'youyong', label: 'yǒuyòng', hanzi: '有用', translation: 'útil / tem utilidade', category: 'adjective', icon: CheckCircle2, hskLevel: 'HSK 2' },
+  { id: 'meiyong', label: 'méiyòng', hanzi: '没用', translation: 'inútil / sem utilidade', category: 'adjective', icon: XCircle, hskLevel: 'HSK 2' },
 
   // Numbers (0 to 9 + liang + tens + hundreds)
   { id: 'ling', label: 'ling', hanzi: '零', translation: '0', category: 'number', icon: Type, hskLevel: 'HSK 1' },
@@ -295,6 +356,8 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'mianbao': 'mianbao',
   'zhi dao': 'zhidao',
   'zhidao': 'zhidao',
+  'ren shi': 'renshi',
+  'renshi': 'renshi',
   'zen me yang': 'zenmeyang',
   'zenme yang': 'zenmeyang',
   'zenmeyang': 'zenmeyang',
@@ -344,6 +407,84 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'weisheme': 'weishenme',
   'yin wei': 'yinwei',
   'yinwei': 'yinwei',
+  'di tu': 'ditu',
+  'ditu': 'ditu',
+  'gang bi': 'gangbi',
+  'gangbi': 'gangbi',
+  'dian ying': 'dianying',
+  'dianying': 'dianying',
+  'shou ji': 'shouji',
+  'shouji': 'shouji',
+  'kuai zi': 'kuaizi',
+  'kuaizi': 'kuaizi',
+  'dan gao': 'dangao',
+  'dangao': 'dangao',
+  'jiao zi': 'jiaozi',
+  'jiaozi': 'jiaozi',
+  'ke le': 'kele',
+  'kele': 'kele',
+  'zu qiu': 'zuqiu',
+  'zuqiu': 'zuqiu',
+  'lan qiu': 'lanqiu',
+  'lanqiu': 'lanqiu',
+  'wang qiu': 'wangqiu',
+  'wangqiu': 'wangqiu',
+  'bang qiu': 'bangqiu',
+  'bangqiu': 'bangqiu',
+  'ping pang qiu': 'pingpangqiu',
+  'pingpang qiu': 'pingpangqiu',
+  'pingpangqiu': 'pingpangqiu',
+  'pao bu': 'paobu',
+  'paobu': 'paobu',
+  'you yong': 'youyong_swim',
+  'youyong': 'youyong_swim',
+  'zhong wen': 'zhongwen',
+  'zhongwen': 'zhongwen',
+  'ying wen': 'yingwen',
+  'yingwen': 'yingwen',
+  'pu wen': 'puwen',
+  'puwen': 'puwen',
+  'zuo tian': 'zuotian',
+  'zuotian': 'zuotian',
+  'ming tian': 'mingtian',
+  'mingtian': 'mingtian',
+  'mei tian': 'meitian',
+  'meitian': 'meitian',
+  'yin tian': 'yintian',
+  'yintian': 'yintian',
+  'hei se': 'heise',
+  'heise': 'heise',
+  'hao chi': 'haochi',
+  'haochi': 'haochi',
+  'hao he': 'haohe',
+  'haohe': 'haohe',
+  'you yi si': 'youyisi',
+  'you yisi': 'youyisi',
+  'youyisi': 'youyisi',
+  'mei you yi si': 'meiyisi',
+  'mei you yisi': 'meiyisi',
+  'meiyou yisi': 'meiyisi',
+  'meiyouyisi': 'meiyisi',
+  'mei yisi': 'meiyisi',
+  'meiyisi': 'meiyisi',
+  'you yong_use': 'youyong',
+  'youyong_use': 'youyong',
+  'mei yong': 'meiyong',
+  'meiyong': 'meiyong',
+  'yi si': 'yisi',
+  'yisi': 'yisi',
+  'bi jiao': 'bijiao',
+  'bijiao': 'bijiao',
+  'fei chang': 'feichang',
+  'feichang': 'feichang',
+  'yi xia': 'yixia',
+  'yixia': 'yixia',
+  'hai shi': 'haishi',
+  'haishi': 'haishi',
+  'xie zi': 'xiezi',
+  'xiezi': 'xiezi',
+  'chi fan': 'chifan',
+  'chifan': 'chifan',
 };
 
 // Helper for natural/fluent idiomatic translation of Mandarin phrases to Portuguese
@@ -370,6 +511,13 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'ba_part') return 'ba';
     if (w.id === 'qu_verb') return 'qu';
     if (w.id === 'you_verb') return 'you';
+    if (w.id === 'yao_verb') return 'yao';
+    if (w.id === 'yong_verb') return 'yong';
+    if (w.id === 'bi_comp') return 'bi';
+    if (w.id === 'da_sport') return 'da';
+    if (w.id === 'youyong_swim') return 'youyong';
+    if (w.id === 'yu_weather') return 'yu';
+    if (w.id === 'zhi_class') return 'zhi';
     if (w.id === 'ta_female') return 'ta';
     if (w.id === 'shi_num') return 'shi';
     if (w.id === 'qian_num') return 'qian';
@@ -415,6 +563,23 @@ function getNaturalTranslation(seq: Word[]): string {
     'wo ye shi xuesheng': 'Eu também sou estudante/aluno(a).',
     'wo ye shi baxi ren': 'Eu também sou brasileiro(a).',
     'wo ye bu zhidao': 'Eu também não sei.',
+    'wo hen gaoxing renshi ni': 'Estou muito contente em conhecê-lo(a) / Prazer em conhecê-lo(a).',
+    'wo hen gaoxing renshi nin': 'Estou muito contente em conhecer o senhor / a senhora.',
+    'wo hen gaoxing renshi nimen': 'Estou muito contente em conhecer vocês.',
+    'wo hen gaoxing renshi dajia': 'Estou muito contente em conhecer a todos!',
+    'hen gaoxing renshi ni': 'Muito prazer em conhecê-lo(a)!',
+    'hen gaoxing renshi nin': 'Muito prazer em conhecer o senhor / a senhora!',
+    'hen gaoxing renshi nimen': 'Muito prazer em conhecer vocês!',
+    'hen gaoxing renshi dajia': 'Muito prazer em conhecer a todos!',
+    'wo ye hen gaoxing renshi ni': 'Eu também estou muito contente em conhecê-lo(a).',
+    'wo ye hen gaoxing renshi nin': 'Eu também estou muito contente em conhecer o senhor / a senhora.',
+    'wo renshi ni': 'Eu conheço você.',
+    'wo bu renshi ni': 'Eu não conheço você.',
+    'wo renshi ta': 'Eu conheço ele(a).',
+    'wo bu renshi ta': 'Eu não conheço ele(a).',
+    'ni renshi ta ma': 'Você conhece ele(a)?',
+    'ni renshi shei': 'Quem você conhece?',
+    'shei renshi ta': 'Quem conhece ele(a)?',
     'bu hao': 'Não estou bem / Ruim.',
     'hao de': 'Certo / Está bem / Ok.',
     'hao bu hao': 'Que tal? / Está de acordo?',
@@ -526,7 +691,7 @@ function getNaturalTranslation(seq: Word[]): string {
     'xuexiao dagai you yi bai xuesheng': 'A escola tem aproximadamente cem alunos.',
     'xuexiao dagai you yi bai ge xuesheng': 'A escola tem aproximadamente cem alunos.',
     'wo xiang ni': 'Eu acredito em você / Penso em você / Sinto sua falta.',
-    'ta xiang qu zhongguo': 'Ela quer ir para a China.',
+    'ta xiang qu zhongguo': 'Ela quer (está pensando em) ir para a China.',
     'wo xiang wo mama de cai': 'Sinto falta da comida da minha mãe.',
     'wo xiang mama de cai': 'Sinto falta da comida da minha mãe.',
     'wo xiang ni shi baxi ren': 'Acho que você é brasileiro(a).',
@@ -592,6 +757,134 @@ function getNaturalTranslation(seq: Word[]): string {
     'liang wan': '20.000 / vinte mil',
     'yi wan er qian san bai si shi wu': '12.345 / doze mil trezentos e quarenta e cinco',
     'yi wan ling wu': '10.005 / dez mil e cinco',
+
+    // Version 1.2026.10.16 Idiomatic Translations:
+    // 1 & 3: Classificadores & Atributos (Livros, Canetas, Mapas, Cores e Línguas)
+    'ta you san ben shu': 'Ele tem três livros.',
+    'wo you san ben shu': 'Eu tenho três livros.',
+    'na zhi bi': 'Qual caneta?',
+    'na zhi gangbi': 'Qual caneta (tinteiro)?',
+    'yi zhang zhongguo ditu': 'Um mapa da China.',
+    'san zhi heise gangbi': 'Três canetas pretas.',
+    'san zhi de heise gangbi': 'Três canetas pretas.',
+    'san zhi heise de gangbi': 'Três canetas pretas.',
+    'liang ben puwen de zhongwen shu': 'Dois livros de chinês em português.',
+    'liang zhang zhongguo ditu': 'Dois mapas da China.',
+    'yi zhang zhongwen de': 'Um é em chinês.',
+    'yi zhang yingwen de': 'Um é em inglês.',
+    'yi zhang zhongwen de yi zhang yingwen de': 'Um é em chinês, um é em inglês.',
+    'zhe ben shu shi shei de': 'De quem é este livro?',
+    'zhe zhi bi shi shei de': 'De quem é esta caneta?',
+
+    // 2 & 11: yi si (意思)
+    'ni de yisi shi': 'Você quis dizer... / O seu sentido é...',
+    'na ge ci shenme yisi': 'O que significa aquela palavra?',
+    'zhe ge ci shenme yisi': 'O que significa esta palavra?',
+    'zhongwen ke you yisi': 'A aula de chinês é interessante.',
+    'zhongwen ke hen you yisi': 'A aula de chinês é muito interessante.',
+    'zhe ge dianying mei you yisi': 'Este filme é chato / sem graça.',
+    'zhe ge dianying meiyou yisi': 'Este filme é chato / sem graça.',
+    'na ge dianying mei you yisi': 'Aquele filme é chato / sem graça.',
+    'ta hen you yisi': 'Ele é muito engraçado / interessante.',
+    'na ge dianying you yisi ma': 'Aquele filme é interessante?',
+    'zhe ge dianying you yisi ma': 'Este filme é interessante?',
+
+    // 4: Permissões & Confirmações (keyi, yixia, xing bu xing)
+    'wo keyi kan ma': 'Eu posso ver?',
+    'wo keyi kan yixia ma': 'Eu posso dar uma olhada?',
+    'wo keyi yixia kan ma': 'Eu posso dar uma olhada?',
+    'wo kan yixia xing bu xing': 'Estou dando uma olhadinha. Tudo bem?',
+    'wo kan yixia shu xing bu xing': 'Estou dando uma olhada no livro. Tudo bem?',
+    'wo kan shu xing bu xing': 'Eu posso ler o livro, tudo bem?',
+    'xing bu xing': 'Tudo bem? / Que tal? / Pode ser?',
+    'xing': 'Tudo bem / Certo / Ok.',
+    'bu xing': 'Não pode / Não está tudo bem.',
+
+    // 5 & 6: Verbo YAO e XIANG
+    'ni yao zhongwen de haishi yingwen de': 'Você quer em chinês ou em inglês?',
+    'ni yao shenme': 'O que você quer?',
+    'wo yao yi bei kafei': 'Eu quero uma xícara de café.',
+    'wo yao yi bei cha': 'Eu quero uma xícara de chá.',
+    'wo yao kafei': 'Eu quero café.',
+    'wo yao cha': 'Eu quero chá.',
+    'ni xiang qu zhongguo ma': 'Você gostaria de ir para a China?',
+
+    // 7: GEI (Verbo dar e preposição para)
+    'wo gei ni yi ge dangao': 'Eu te dou um bolo / Eu (vou) te dar um bolo.',
+    'wo gei ni dangao': 'Eu te dou bolo.',
+    'ni gei ta shenme': 'O que você vai dar para ele(a)?',
+    'wo gei ni mai le yi ge dangao': 'Eu comprei um bolo para você.',
+    'wo gei ni mai dangao': 'Eu compro bolo para você.',
+
+    // 8: Verbo GAN (干)
+    'tamen gan shenme': 'O que eles estão fazendo?',
+    'ta men gan shenme': 'O que eles estão fazendo?',
+    'ni gan shenme': 'O que você está fazendo?',
+    'kan ditu gan shenme': 'Olhando o mapa... para quê? / Por que olhar o mapa?',
+
+    // 9: Comparações com BI (比)
+    'wo didi bi wo gao': 'Meu irmãozinho é mais alto que eu.',
+    'wo gege bi wo gao': 'Meu irmão mais velho é mais alto que eu.',
+    'ta bi wo gao': 'Ele(a) é mais alto(a) que eu.',
+    'wo bi ta gao': 'Eu sou mais alto(a) que ele(a).',
+
+    // 10: Escala de Intensidade & Expressões
+    'zhen de ma': 'Sério? / É verdade?',
+    'zhen de': 'Realmente / É verdade.',
+    'wo bijiao mang': 'Eu estou relativamente ocupado(a).',
+    'jintian bijiao re': 'Hoje está relativamente quente.',
+    'jintian feichang re': 'Hoje está extremamente quente.',
+    'jintian hen re': 'Hoje está muito quente / quente.',
+    'zuotian hen leng': 'Ontem estava frio / muito frio.',
+    'zuotian feichang leng': 'Ontem estava extremamente frio.',
+    'zuotian bijiao leng': 'Ontem estava relativamente frio.',
+
+    // 12: Verbo YONG (用)
+    'women yong bi xiezi': 'Nós usamos a caneta para escrever / escrevemos com a caneta.',
+    'wo men yong bi xiezi': 'Nós usamos a caneta para escrever / escrevemos com a caneta.',
+    'women yong gangbi xiezi': 'Nós usamos a caneta para escrever.',
+    'ta meitian yong shouji': 'Ela usa o celular todo dia.',
+    'wo meitian yong shouji': 'Eu uso o celular todo dia.',
+    'wo yong kuaizi chifan': 'Eu como com pauzinhos (uso hashis para comer).',
+    'women yong kuaizi chifan': 'Nós comemos com pauzinhos.',
+    'you yong': 'Útil / Tem utilidade.',
+    'mei yong': 'Inútil / Não serve.',
+    'zhe ge you yong': 'Isto é útil.',
+    'zhe ge mei yong': 'Isto é inútil.',
+
+    // 13: Perguntando o Sujeito / Posse
+    'shi shei de': 'De quem é...?',
+    'zhe shi shei de': 'De quem é isto?',
+    'ta shi shei': 'Quem é ele(a)?',
+
+    // 14: Verbo WAN & Esportes com Bola (球)
+    'ta xihuan da qiu': 'Ele gosta de jogar bola.',
+    'ta xihuan wan': 'Ele gosta de brincar / curtir.',
+    'ta xihuan zuqiu': 'Ele gosta de futebol.',
+    'ta xihuan lanqiu': 'Ele gosta de basquete.',
+    'ta xihuan wangqiu': 'Ele gosta de tênis.',
+    'ta xihuan bangqiu': 'Ele gosta de beisebol.',
+    'ta xihuan pingpangqiu': 'Ele gosta de ping-pong.',
+    'ta xihuan paobu': 'Ele gosta de corrida / correr.',
+    'ta xihuan youyong': 'Ele gosta de nadar / natação.',
+    'ni xiang qu wan ma': 'Você quer ir brincar / se divertir?',
+
+    // 15: Tempo Cronológico e Climático
+    'zuotian yu le': 'Choveu ontem.',
+    'zuotian xia yu le': 'Choveu ontem.',
+    'jintian yintian': 'Hoje está nublado.',
+    'jintian shi yintian': 'Hoje é um dia nublado.',
+    'mingtian qingtian': 'Amanhã vai fazer sol / ensolarado.',
+    'mingtian shi qingtian': 'Amanhã vai fazer sol.',
+
+    // 16: Comida e Bebida Gostosa
+    'jiaozi zhen hao chi': 'Bolinhos são deliciosos / realmente muito gostosos.',
+    'jiaozi hen hao chi': 'Bolinhos são muito gostosos.',
+    'cai zhen hao chi': 'A comida é realmente uma delícia.',
+    'kele bu hao he': 'Coca-Cola não tem gosto bom / não é gostosa de beber.',
+    'kele bu haohe': 'Coca-Cola não tem gosto bom.',
+    'kafei hen hao he': 'Café é muito gostoso de beber.',
+    'cha hen hao he': 'Chá é muito saboroso de beber.',
   };
 
   // Regra especial: se a frase termina com 'wo jiao' (我叫), colocar o nome do usuário na frente
@@ -680,24 +973,39 @@ function checkIsValid(seq: Word[]): boolean {
     return verbExists;
   }
 
+  // If ending in particle 'le' (了)
+  if (last.id === 'le' && seq.length > 1) return true;
+
+  // If ending in 'xing' (行) - e.g. "xing", "bu xing", "wo kan yixia xing bu xing"
+  if (last.id === 'xing') return true;
+
+  // If ending in 'yisi' (意思)
+  if (last.id === 'yisi') {
+    return seq.some(w => ['you_verb', 'mei', 'shenme', 'de'].includes(w.id));
+  }
+
   // If it's a verb, but NOT transitive verbs requiring objects (unless negated or preceded by auxiliary verbs keyi/hui/qing/xiang in short dialogue)
   if (last.category === 'verb') {
     const isNegated = seq.some(w => w.id === 'bu' || w.id === 'mei');
     const isModalOrPolite = seq.some(w => ['keyi', 'hui', 'qing', 'xiang'].includes(w.id));
     if (last.id === 'zhidao') return true; // 'wo zhidao' or 'wo bu zhidao' is a complete valid clause
+    if (last.id === 'xing') return true;
+    if (['wan', 'xiezi', 'chifan', 'paobu', 'youyong_swim'].includes(last.id)) return true; // Complete intransitive actions
     // 'wo jiao' é uma frase válida completa (Eu me chamo [Nome do usuário])
     if (last.id === 'jiao' && seq.some(w => w.id === 'wo')) return true;
-    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb', 'kan', 'xuexi', 'zuo', 'jin', 'da_call', 'fa_verb', 'zhidao'].includes(last.id)) return true; // 'ni keyi shuo', 'wo hui shuo', 'qing shuo', 'wo xiang chi', 'wo xiang qu', 'wo xiang kan'
-    if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb', 'xiang'].includes(last.id)) {
+    if ((isNegated || isModalOrPolite) && ['shuo', 'he', 'chi', 'xihuan', 'qu_verb', 'kan', 'xuexi', 'zuo', 'jin', 'da_call', 'fa_verb', 'zhidao', 'mai', 'yao_verb'].includes(last.id)) return true;
+    if (['shi', 'jiao', 'zai', 'keyi', 'hui', 'da_call', 'fa_verb', 'you_verb', 'qu_verb', 'xiang', 'yong_verb', 'gan', 'bi_comp'].includes(last.id)) {
       return false;
     }
     return true;
-    // 'zuo' (sentar), 'jin' (entrar) are valid intransitive endings!
   }
 
   // If ending in etiquette like xie xie, zai jian, or affirmation like hao de
   if (last.category === 'etiquette' && (last.id === 'xie_xie' || last.id === 'zaijian')) return true;
-  if (last.id === 'de' && seq.length === 2 && seq[0].id === 'hao') return true;
+  if (last.id === 'de') {
+    const prev = seq.length > 1 ? seq[seq.length - 2] : null;
+    if (prev && ['hao', 'zhen', 'shei', 'zhongwen', 'yingwen', 'puwen'].includes(prev.id)) return true;
+  }
 
   // If ending in pronoun (as object of verb or polite expression, e.g. wo xiang ni, wo xihuan ni, xie xie ni, xie xie nin, xie xie dajia)
   if (last.category === 'pronoun') {
@@ -772,20 +1080,28 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       return [];
     }
 
-    // Case: Preposition selected (ex: gei)
+    // Case: Preposition selected (ex: gei, bi_comp)
     if (last.category === 'preposition') {
       if (last.id === 'gei') {
         // Must be followed by recipient (pronoun, noun, family)
         return WORDS.filter(w => w.category === 'pronoun' || w.category === 'noun' || w.category === 'family');
       }
+      if (last.id === 'bi_comp') {
+        // Must be followed by compared target (pronoun, family, noun)
+        return WORDS.filter(w => ['pronoun', 'family', 'noun'].includes(w.category));
+      }
       return [];
     }
 
-    // Case: Conjunction selected (ex: he_conj, yinwei)
+    // Case: Conjunction selected (ex: he_conj, yinwei, haishi)
     if (last.category === 'conjunction') {
       if (last.id === 'yinwei') {
         // yinwei (因为 - porque): seguido de sujeito (pronoun, noun, family) ou zai
         return WORDS.filter(w => ['pronoun', 'noun', 'family'].includes(w.category) || w.id === 'zai');
+      }
+      if (last.id === 'haishi') {
+        // haishi (还是 - ou em perguntas): seguido de opções (noun, thing, country)
+        return WORDS.filter(w => ['noun', 'thing', 'country'].includes(w.category));
       }
       if (last.id === 'he_conj') {
         // Must be followed by pronoun, noun, family, thing, country
@@ -801,9 +1117,14 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
     // Case: Pronoun selected (wo, ni, ta, ta_female, zhe, na_dem, dajia, nin)
     if (last.category === 'pronoun') {
-      // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we must follow with a verb
+      // If we just had a preposition like 'gei' + pronoun (ex: wo gei ni), we can follow with a verb or direct object/classifier/question
       if (prev?.category === 'preposition' && prev.id === 'gei') {
-        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+        return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo', 'mai', 'yi', 'liang', 'ge_class', 'dangao', 'shu', 'shenme'].includes(w.id));
+      }
+
+      // If we just had comparison 'bi_comp' + pronoun (ex: wo didi bi wo), follow with adjective
+      if (prev?.category === 'preposition' && prev.id === 'bi_comp') {
+        return WORDS.filter(w => w.category === 'adjective');
       }
 
       // If a verb exists in the sequence (Pronoun as Object, or Embedded Clause Subject after xiang)
@@ -1064,6 +1385,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => w.id === 'yidian' || ['noun', 'thing', 'pronoun', 'question', 'family'].includes(w.category));
       }
 
+      if (last.id === 'renshi') {
+        // 'renshi' (认识 - conhecer pessoas): seguido de pronome (ni, ta, wo, nin, nimen, dajia), família, substantivos humanos (laoshi, pengyou, xuesheng) ou pronome interrogativo (shei, shenme)
+        return WORDS.filter(w => ['pronoun', 'family'].includes(w.category) || ['laoshi', 'pengyou', 'xuesheng', 'shei', 'shenme', 'ma', 'ba_part', 'ne'].includes(w.id));
+      }
+
       if (last.id === 'he') {
         return WORDS.filter(w => ['shui', 'cha', 'kafei', 'tang', 'yidian', 'shenme', 'ma', 'ba_part'].includes(w.id));
       }
@@ -1260,6 +1586,8 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => {
           if (w.id === 'ma' || w.id === 'ba_part') return true;
           if (last.id === 'hao' && (w.id === 'de' || w.id === 'bu')) return true;
+          // 'gaoxing' (高兴 - feliz/contente): permite seguir com a ação 'renshi' (认识 - em "wo hen gaoxing renshi ni")
+          if (last.id === 'gaoxing' && w.id === 'renshi') return true;
           return false;
         });
       }
@@ -1874,6 +2202,11 @@ function tokenizePhraseInput(input: string): string[] {
       i++;
       continue;
     }
+    if (norm === 'renshi') {
+      tokens.push('renshi');
+      i++;
+      continue;
+    }
 
     // Try 3-word window
     if (i + 2 < rawWords.length) {
@@ -2079,6 +2412,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isNumbersModalOpen, setIsNumbersModalOpen] = useState<boolean>(false);
+  const [isFalseFriendsOpen, setIsFalseFriendsOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -2310,7 +2644,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.09.20
+                  v1.2026.10.16
                 </span>
               </div>
               <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
@@ -2408,6 +2742,18 @@ export default function App() {
             >
               <BookOpen className="w-4 h-4 text-indigo-600" />
               <span className="hidden sm:inline">Dicionário</span>
+            </button>
+
+            {/* Não Confundir / Falsos Cognatos & Homófonos Modal Button */}
+            <button
+              id="open-false-friends-btn"
+              type="button"
+              onClick={() => setIsFalseFriendsOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-800 shadow-xs transition-all cursor-pointer"
+              title="Não Confundir! Guia de Falsos Cognatos e Homófonos no Mandarim (Item 17.1.1)"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <span className="hidden sm:inline">Não Confundir</span>
             </button>
 
             {/* User Profile Pill & Sign Out */}
@@ -2514,6 +2860,12 @@ export default function App() {
         <ChineseNumbersModal
           isOpen={isNumbersModalOpen}
           onClose={() => setIsNumbersModalOpen(false)}
+        />
+
+        {/* Modal de Não Confundir: Falsos Cognatos e Homófonos no Mandarim (Item 17.1.1) */}
+        <FalseFriendsModal
+          isOpen={isFalseFriendsOpen}
+          onClose={() => setIsFalseFriendsOpen(false)}
         />
       </div>
     </div>

@@ -260,21 +260,42 @@ export const SentenceBuilder: React.FC<SentenceBuilderProps> = ({
       )}
 
       {validationReport && (
-        <div className={`text-[11px] px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-          validationReport.success 
-            ? 'bg-emerald-50/90 text-emerald-900 border-emerald-200' 
-            : 'bg-rose-50/90 text-rose-900 border-rose-200'
-        }`}>
-          {validationReport.success ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+        <div className="flex flex-col gap-1.5">
+          <div className={`text-[11px] px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
+            validationReport.success 
+              ? 'bg-emerald-50/90 text-emerald-900 border-emerald-200' 
+              : 'bg-rose-50/90 text-rose-900 border-rose-200'
+          }`}>
+            {validationReport.success ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+            )}
+            <span className="truncate">
+              {validationReport.success 
+                ? 'Frase montada com sucesso.' 
+                : (validationReport.contextualGrammarTip?.description || validationReport.errorReason || 'Ajuste a ordem das palavras.')}
+            </span>
+          </div>
+
+          {/* Item 2.1: 你的意思是...? (Você quis dizer...?) */}
+          {validationReport.suggestion && validationReport.suggestion.hasCorrections && (
+            <button
+              type="button"
+              onClick={() => {
+                const corrected = validationReport.suggestion!.suggestedText;
+                setSearchQuery(corrected);
+                handleValidateAndBuildPhrase(corrected);
+              }}
+              className="text-left flex items-center gap-2 text-[11px] font-semibold text-indigo-800 bg-indigo-50/90 hover:bg-indigo-100 p-2.5 rounded-xl border border-indigo-200/80 transition-all cursor-pointer shadow-2xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>
+                <strong className="font-bold text-indigo-900">你的意思是</strong> (Você quis dizer):{' '}
+                <span className="font-mono underline text-indigo-700">{validationReport.suggestion.suggestedText}</span>?
+              </span>
+            </button>
           )}
-          <span className="truncate">
-            {validationReport.success 
-              ? 'Frase montada com sucesso.' 
-              : (validationReport.contextualGrammarTip?.description || validationReport.errorReason || 'Ajuste a ordem das palavras.')}
-          </span>
         </div>
       )}
 

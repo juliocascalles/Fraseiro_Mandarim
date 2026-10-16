@@ -93,7 +93,10 @@ export type ChallengeCategory =
   | 'weather_climate'
   | 'quantities_comparison'
   | 'intentions_feelings'
-  | 'causes_reasons';
+  | 'causes_reasons'
+  | 'objects_attributes'
+  | 'permissions_opinions'
+  | 'sports_hobbies';
 
 export interface PracticeChallenge {
   id: string;
@@ -109,7 +112,7 @@ export interface PracticeChallenge {
   suggestedFirstWordIds?: string[];
 }
 
-export type QuizQuestionType = 'fill_blank' | 'order_words';
+export type QuizQuestionType = 'fill_blank' | 'order_words' | 'hanzi_recognition' | 'false_friends';
 
 export interface QuizOption {
   id: string;
@@ -129,7 +132,8 @@ export interface QuizQuestion {
   hskLevel: HskLevel;
   grammarRuleTitle: string;
   grammarExplanation: string;
-  // For 'fill_blank'
+  isHanziOnly?: boolean; // When true, hides pinyin and translation from options to test pure Hanzi recognition
+  // For 'fill_blank', 'hanzi_recognition', 'false_friends'
   prefixHanzi?: string;
   suffixHanzi?: string;
   fullHanzi: string;
@@ -140,6 +144,34 @@ export interface QuizQuestion {
   // For 'order_words'
   wordsToOrder?: Word[];
   correctSequenceHanzi?: string;
+}
+
+export interface FalseFriendEntry {
+  id: string;
+  item1: {
+    hanzi: string;
+    pinyin: string;
+    meaning: string;
+    example: string;
+    examplePt: string;
+  };
+  item2: {
+    hanzi: string;
+    pinyin: string;
+    meaning: string;
+    example: string;
+    examplePt: string;
+  };
+  item3?: {
+    hanzi: string;
+    pinyin: string;
+    meaning: string;
+    example: string;
+    examplePt: string;
+  };
+  warningTitle: string;
+  whyConfusing: string;
+  mnemonicTip: string;
 }
 
 export interface QuizStats {
