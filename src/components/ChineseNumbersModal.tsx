@@ -7,7 +7,7 @@ interface ChineseNumbersModalProps {
   isOpen: boolean;
   onClose: () => void;
   onInsertWords?: (numberWords: Word[]) => void;
-  allWords: Word[];
+  allWords?: Word[];
 }
 
 const PRESET_EXAMPLES = [
@@ -27,7 +27,7 @@ export const ChineseNumbersModal: React.FC<ChineseNumbersModalProps> = ({
   isOpen,
   onClose,
   onInsertWords,
-  allWords,
+  allWords = [],
 }) => {
   const [inputVal, setInputVal] = useState<string>('12345');
   const [copied, setCopied] = useState<boolean>(false);

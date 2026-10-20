@@ -26,6 +26,7 @@ import { HanziCanvasMode } from './components/HanziCanvasMode';
 import { GoogleLoginGate } from './components/GoogleLoginGate';
 import { ChineseNumbersModal } from './components/ChineseNumbersModal';
 import { FalseFriendsModal } from './components/FalseFriendsModal';
+import { HanziFlashcardsMode } from './components/HanziFlashcardsMode';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
@@ -104,7 +105,7 @@ const WORDS: Word[] = [
   { id: 'yong_verb', label: 'yòng', hanzi: '用', translation: 'usar / utilizar / por meio de', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'xie', label: 'xiě', hanzi: '写', translation: 'escrever', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
   { id: 'xiezi', label: 'xiězì', hanzi: '写字', translation: 'escrever ideogramas', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
-  { id: 'wan', label: 'wán', hanzi: '玩', translation: 'brincar / jogar / curtir', category: 'verb', icon: Smile, hskLevel: 'HSK 2' },
+  { id: 'wan', label: 'wán / wánr', hanzi: '玩 / 玩儿', translation: 'brincar / jogar / curtir', category: 'verb', icon: Smile, hskLevel: 'HSK 2' },
   { id: 'paobu', label: 'pǎobù', hanzi: '跑步', translation: 'correr / corrida', category: 'verb', icon: Play, hskLevel: 'HSK 2' },
   { id: 'youyong_swim', label: 'yóuyǒng', hanzi: '游泳', translation: 'nadar / natação (esporte)', category: 'verb', icon: Droplets, hskLevel: 'HSK 2' },
   { id: 'xing', label: 'xíng', hanzi: '行', translation: 'ok / tudo bem / aceitável', category: 'verb', icon: CheckCircle2, hskLevel: 'HSK 2' },
@@ -217,6 +218,8 @@ const WORDS: Word[] = [
   { id: 'tang', label: 'tang', hanzi: '汤', translation: 'sopa', category: 'thing', icon: Soup, hskLevel: 'HSK 2' },
   { id: 'qian', label: 'qián', hanzi: '钱', translation: 'dinheiro (preço)', category: 'thing', icon: Coins, hskLevel: 'HSK 2' },
   { id: 'ditu', label: 'dìtú', hanzi: '地图', translation: 'mapa', category: 'thing', icon: Compass, hskLevel: 'HSK 2' },
+  { id: 'zhaopian', label: 'zhàopiàn', hanzi: '照片', translation: 'foto / fotografia', category: 'thing', icon: FileText, hskLevel: 'HSK 2' },
+  { id: 'cidian', label: 'cídiǎn', hanzi: '词典', translation: 'dicionário', category: 'thing', icon: Book, hskLevel: 'HSK 2' },
   { id: 'bi', label: 'bǐ', hanzi: '笔', translation: 'caneta / instrumento de escrita', category: 'thing', icon: PenTool, hskLevel: 'HSK 1' },
   { id: 'gangbi', label: 'gāngbǐ', hanzi: '钢笔', translation: 'caneta-tinteiro / caneta', category: 'thing', icon: PenTool, hskLevel: 'HSK 2' },
   { id: 'shouji', label: 'shǒujī', hanzi: '手机', translation: 'celular', category: 'thing', icon: MessageSquare, hskLevel: 'HSK 2' },
@@ -485,6 +488,13 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'xiezi': 'xiezi',
   'chi fan': 'chifan',
   'chifan': 'chifan',
+  'wan er': 'wan',
+  'waner': 'wan',
+  'wanr': 'wan',
+  'zhao pian': 'zhaopian',
+  'zhaopian': 'zhaopian',
+  'ci dian': 'cidian',
+  'cidian': 'cidian',
 };
 
 // Helper for natural/fluent idiomatic translation of Mandarin phrases to Portuguese
@@ -521,7 +531,7 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'ta_female') return 'ta';
     if (w.id === 'shi_num') return 'shi';
     if (w.id === 'qian_num') return 'qian';
-    if (w.id === 'wan_num') return 'wan';
+    if (w.id === 'wan_num') return 'wan_num';
     if (w.id === 'wan') return 'wan';
     if (w.id === 'ge_class') return 'ge';
     if (w.id === 'na_dem') return 'na';
@@ -754,10 +764,21 @@ function getNaturalTranslation(seq: Word[]): string {
     'yi qian': '1.000 / mil',
     'er qian': '2.000 / dois mil',
     'liang qian': '2.000 / dois mil',
+    'yi wan_num': '10.000 / dez mil',
+    'liang wan_num': '20.000 / vinte mil',
+    'yi wan_num er qian san bai si shi wu': '12.345 / doze mil trezentos e quarenta e cinco',
+    'yi wan_num ling wu': '10.005 / dez mil e cinco',
     'yi wan': '10.000 / dez mil',
     'liang wan': '20.000 / vinte mil',
     'yi wan er qian san bai si shi wu': '12.345 / doze mil trezentos e quarenta e cinco',
     'yi wan ling wu': '10.005 / dez mil e cinco',
+    'wan': 'brincar / curtir / divertir-se',
+    'qu wan': 'Ir brincar / curtir',
+    'xiang qu wan': 'Querer ir brincar / se divertir',
+    'yi zhang zhaopian': 'Uma foto / fotografia.',
+    'yi ben cidian': 'Um dicionário.',
+    'ta you zhaopian': 'Ele(a) tem foto(s).',
+    'wo you cidian': 'Eu tenho dicionário.',
 
     // Version 1.2026.10.16 Idiomatic Translations:
     // 1 & 3: Classificadores & Atributos (Livros, Canetas, Mapas, Cores e Línguas)
@@ -1281,9 +1302,9 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     // Case: Verb selected
     if (last.category === 'verb') {
       if (last.id === 'qu_verb') {
-        // 'qu' (去 - ir): followed by destinations (chaoshi, xuexiao, daxue, jia, difang, countries, nali, shenme, zhe, na_dem, nar, nali_there) or particle ba
+        // 'qu' (去 - ir): followed by destinations or purpose actions (wan, kan, xuexi, chifan, mai) or particle ba
         return WORDS.filter(w => {
-          if (['chaoshi', 'xuexiao', 'daxue', 'jia', 'difang', 'nali', 'shenme', 'zhe', 'na_dem', 'ba_part', 'nar', 'nali_there'].includes(w.id)) return true;
+          if (['chaoshi', 'xuexiao', 'daxue', 'jia', 'difang', 'nali', 'shenme', 'zhe', 'na_dem', 'ba_part', 'nar', 'nali_there', 'wan', 'kan', 'xuexi', 'chifan', 'mai'].includes(w.id)) return true;
           if (w.category === 'country') return true;
           if (w.id === 'ma') return true;
           return false;
@@ -1318,7 +1339,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'kan') {
-        return WORDS.filter(w => ['shu', 'ma', 'ba_part'].includes(w.id));
+        return WORDS.filter(w => ['shu', 'zhaopian', 'ditu', 'ma', 'ba_part', 'yixia'].includes(w.id));
       }
 
       if (last.id === 'xuexi') {
@@ -1328,12 +1349,16 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       if (last.id === 'xihuan') {
         const subjectPronoun = sequence.find(w => w.category === 'pronoun');
         return WORDS.filter(w => {
-          if (w.id === 'chi' || w.id === 'he') return true;
+          if (['chi', 'he', 'wan', 'paobu', 'youyong_swim', 'da_sport', 'kan', 'xuexi'].includes(w.id)) return true;
           if (['thing', 'family'].includes(w.category)) return true;
           if (w.category === 'question') return ['shei', 'shenme'].includes(w.id);
           if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
           return false;
         });
+      }
+
+      if (last.id === 'wan') {
+        return WORDS.filter(w => ['ma', 'ba_part', 'ne', 'le', 'nar', 'nali_there'].includes(w.id));
       }
 
       if (last.id === 'shuo') {
@@ -1662,7 +1687,14 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
     }
   }
 
-  return finalWords;
+  // Deduplicate words by ID to guarantee no duplicate buttons or entries
+  const uniqueWordsMap = new Map<string, Word>();
+  for (const w of finalWords) {
+    if (!uniqueWordsMap.has(w.id)) {
+      uniqueWordsMap.set(w.id, w);
+    }
+  }
+  return Array.from(uniqueWordsMap.values());
 }
 
 // Function to normalize pinyin / search text (remove diacritics, lowercase, strip punctuation)
@@ -1726,6 +1758,23 @@ function findCandidatesForToken(rawToken: string): Word[] {
     return res;
   }
   if (norm === 'wan') {
+    const rawTrim = rawToken.trim();
+    if (rawTrim === '万') {
+      const wanNum = WORDS.find(w => w.id === 'wan_num');
+      if (wanNum) return [wanNum];
+    }
+    if (rawTrim === '玩' || rawTrim === '玩儿') {
+      const wanWord = WORDS.find(w => w.id === 'wan');
+      if (wanWord) return [wanWord];
+    }
+    const wanWord = WORDS.find(w => w.id === 'wan');
+    const wanNum = WORDS.find(w => w.id === 'wan_num');
+    const res: Word[] = [];
+    if (wanWord) res.push(wanWord);
+    if (wanNum) res.push(wanNum);
+    return res;
+  }
+  if (norm === 'wanr' || norm === 'waner') {
     const wanWord = WORDS.find(w => w.id === 'wan');
     if (wanWord) return [wanWord];
   }
@@ -2423,7 +2472,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz' | 'flashcards'>('chat');
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [sequence, setSequence] = useState<Word[]>([]);
   const [insertIndex, setInsertIndex] = useState<number>(0);
@@ -2482,17 +2531,20 @@ export default function App() {
 
   // Available words for current sequence state and active insertion position
   const availableWords = useMemo(() => {
+    let allowed: Word[];
     if (activeInsertIndex === sequence.length) {
-      return getAvailableWordsForSequence(sequence);
+      allowed = getAvailableWordsForSequence(sequence);
+    } else {
+      allowed = WORDS.filter(word => {
+        const candidate = [
+          ...sequence.slice(0, activeInsertIndex),
+          word,
+          ...sequence.slice(activeInsertIndex)
+        ];
+        return validateWordSequence(candidate).success;
+      });
     }
-    return WORDS.filter(word => {
-      const candidate = [
-        ...sequence.slice(0, activeInsertIndex),
-        word,
-        ...sequence.slice(activeInsertIndex)
-      ];
-      return validateWordSequence(candidate).success;
-    });
+    return Array.from(new Map(allowed.map(w => [w.id, w])).values());
   }, [sequence, activeInsertIndex]);
 
   // Helper to check if sequence forms a complete/valid clause
@@ -2570,7 +2622,7 @@ export default function App() {
         normalizePinyinText(w.translation).includes(normQ)
       );
     }
-    return words;
+    return Array.from(new Map(words.map(w => [w.id, w])).values());
   }, [searchQuery, availableWords]);
 
   // All words matching the search query in the entire vocabulary
@@ -2645,7 +2697,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.10.16
+                  v1.2026.10.20
                 </span>
               </div>
               <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
@@ -2673,6 +2725,25 @@ export default function App() {
                   activeTab === 'chat' ? 'bg-indigo-700 text-white' : 'bg-emerald-100 text-emerald-800'
                 }`}>
                   Live
+                </span>
+              </button>
+
+              <button
+                id="tab-flashcards-btn"
+                onClick={() => setActiveTab('flashcards')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'flashcards'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Flashcards Mnemônicos: o desenho dos hanzis para lembrar o significado"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Flashcards</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'flashcards' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-900'
+                }`}>
+                  Mnemônicas
                 </span>
               </button>
 
@@ -2821,6 +2892,18 @@ export default function App() {
             getNaturalTranslation={getNaturalTranslation}
             validateAndBuildPhrase={validateAndBuildPhrase}
           />
+        ) : activeTab === "flashcards" ? (
+          <HanziFlashcardsMode
+            allWords={WORDS}
+            onOpenCanvasWithChar={(char) => {
+              setActiveTab("hanzi");
+            }}
+            onSendToBuilder={(words) => {
+              setSequence(prev => [...prev, ...words]);
+              setInsertIndex(prev => prev + words.length);
+              setActiveTab("chat");
+            }}
+          />
         ) : activeTab === "hanzi" ? (
           <HanziCanvasMode
             allWords={WORDS}
@@ -2861,6 +2944,11 @@ export default function App() {
         <ChineseNumbersModal
           isOpen={isNumbersModalOpen}
           onClose={() => setIsNumbersModalOpen(false)}
+          allWords={WORDS}
+          onInsertWords={(words) => {
+            setSequence(prev => [...prev, ...words]);
+            setInsertIndex(prev => prev + words.length);
+          }}
         />
 
         {/* Modal de Não Confundir: Falsos Cognatos e Homófonos no Mandarim (Item 17.1.1) */}

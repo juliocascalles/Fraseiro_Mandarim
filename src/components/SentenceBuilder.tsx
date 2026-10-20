@@ -130,12 +130,15 @@ export const SentenceBuilder: React.FC<SentenceBuilderProps> = ({
   };
 
   const availableWords = useMemo(() => {
+    let allowed: Word[];
     if (activeInsertIndex === sequence.length) {
-      return getAvailableWords(sequence);
+      allowed = getAvailableWords(sequence);
+    } else {
+      const currentPrefix = sequence.slice(0, activeInsertIndex);
+      allowed = getAvailableWords(currentPrefix);
     }
-    const currentPrefix = sequence.slice(0, activeInsertIndex);
-    const allowed = getAvailableWords(currentPrefix);
-    return allWords.filter(word => allowed.some(aw => aw.id === word.id));
+    const filtered = allWords.filter(word => allowed.some(aw => aw.id === word.id));
+    return Array.from(new Map(filtered.map(w => [w.id, w])).values());
   }, [sequence, activeInsertIndex, getAvailableWords, allWords]);
 
   const isValidSentence = useMemo(() => {
@@ -181,7 +184,7 @@ export const SentenceBuilder: React.FC<SentenceBuilderProps> = ({
         normalizePinyin(w.translation).includes(normQ)
       );
     }
-    return words;
+    return Array.from(new Map(words.map(w => [w.id, w])).values());
   }, [searchQuery, availableWords, allWords]);
 
   return (

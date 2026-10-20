@@ -344,4 +344,35 @@ export interface HanziCharacter {
   }>;
 }
 
+export interface HanziRadicalBreakdown {
+  part: string;
+  pinyin: string;
+  name: string;
+  meaning: string;
+  visualRole: string;
+  color?: string;
+}
 
+export interface HanziVisualFlashcard {
+  id: string;
+  hanzi: string;
+  pinyin: string;
+  pinyinRaw?: string; // sem diacríticos (ex: zhidao)
+  translation: string;
+  emoji: string; // Ex: '🏹🧠', '✅', '📷', etc.
+  hintPhrase: string; // A frase exata de dica explicando o desenho
+  hskLevel: HskLevel;
+  category: string;
+  visualDescription: string;
+  mnemonicStory: string;
+  distractorPinyins?: string[]; // Opções de pinyin distratoras para o teste
+  distractorOptions?: Array<{ pinyin: string; translation: string; pinyinRaw?: string; }>;
+  components: HanziRadicalBreakdown[];
+  exampleSentence: {
+    hanzi: string;
+    pinyin: string;
+    portuguese: string;
+  };
+  retentionTip: string;
+  etymologyNote?: string;
+}

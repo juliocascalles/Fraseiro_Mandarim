@@ -329,9 +329,7 @@ export function parseChineseNumberWordIds(ids: string[]): {
     'shi': { type: 'multiplier', val: 10, hanzi: '十', pinyin: 'shí' },
     'bai': { type: 'multiplier', val: 100, hanzi: '百', pinyin: 'bǎi' },
     'qian_num': { type: 'multiplier', val: 1000, hanzi: '千', pinyin: 'qiān' },
-    'qian': { type: 'multiplier', val: 1000, hanzi: '千', pinyin: 'qiān' },
     'wan_num': { type: 'multiplier', val: 10000, hanzi: '万', pinyin: 'wàn' },
-    'wan': { type: 'multiplier', val: 10000, hanzi: '万', pinyin: 'wàn' },
   };
 
   // Check if all tokens are numbers
