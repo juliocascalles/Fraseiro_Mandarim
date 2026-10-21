@@ -1388,6 +1388,20 @@ export const CURATED_QUIZ_QUESTIONS: QuizQuestion[] = [
       },
     ],
   },
+
+  // 31. Organização de Frase: 周末你干什么了？
+  {
+    id: 'quiz_order_zhoumo_gan_shenme_le',
+    type: 'order_words',
+    portuguese: 'Ordene os blocos para formar: "O que você fez no fim de semana?"',
+    categoryName: 'Rotina & Fim de Semana',
+    hskLevel: 'HSK 2',
+    grammarRuleTitle: 'Ordem de Tempo e Ação: 周末你干什么了？',
+    grammarExplanation: 'O marcador de tempo (周末 - fim de semana) precede o verbo. O pronome interrogativo (什么) atua como objeto de "gàn" (干/敢), e a partícula "le" (了) indica a conclusão da ação.',
+    correctSequenceHanzi: '周末你干什么了',
+    fullHanzi: '周末你干什么了？',
+    fullPinyin: 'Zhōumò nǐ gàn shénme le?',
+  },
 ];
 
 /**
@@ -1403,13 +1417,72 @@ export function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
+ * Dynamically generates a Pure Hanzi Recognition question from all words in the app
+ * (Exact same list as chat and dictionary)
+ */
+export function generatePureHanziQuestionFromWords(allWords: Word[], excludeIds: string[] = []): QuizQuestion {
+  // Filter words that have valid characters and translations
+  const eligible = allWords.filter(w => w.hanzi && w.translation && !excludeIds.includes(`pure_hanzi_${w.id}`));
+  const pool = eligible.length > 0 ? eligible : allWords;
+  
+  const target = pool[Math.floor(Math.random() * pool.length)];
+  
+  // Pick 3 distractors with different hanzi
+  const distractors = allWords.filter(w => w.id !== target.id && w.hanzi !== target.hanzi)
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 3);
+    
+  const options = [
+    {
+      id: `opt_pure_${target.id}`,
+      hanzi: target.hanzi,
+      pinyin: target.label,
+      translation: target.translation,
+      isCorrect: true,
+      explanation: `Correto! ${target.hanzi} (${target.label}) significa "${target.translation}".`,
+    },
+    ...distractors.map(d => ({
+      id: `opt_pure_${d.id}`,
+      hanzi: d.hanzi,
+      pinyin: d.label,
+      translation: d.translation,
+      isCorrect: false,
+      explanation: `Incorreto! ${d.hanzi} (${d.label}) significa "${d.translation}".`,
+    }))
+  ];
+
+  return {
+    id: `pure_hanzi_${target.id}_${Date.now()}`,
+    type: 'hanzi_recognition',
+    isHanziOnly: true,
+    portuguese: `Identifique o ideograma correspondente a: "${target.translation.toUpperCase()}"`,
+    categoryName: 'Identificação de Hanzi Puro',
+    hskLevel: target.hskLevel || 'HSK 1',
+    grammarRuleTitle: `Reconhecimento Visual: ${target.hanzi} (${target.label})`,
+    grammarExplanation: `O caractere ${target.hanzi} (${target.label}) representa "${target.translation}".`,
+    prefixHanzi: `Qual ideograma significa "${target.translation}"? 👉`,
+    suffixHanzi: '',
+    fullHanzi: `${target.hanzi} (${target.label} - ${target.translation})`,
+    fullPinyin: target.label,
+    correctAnswerId: `opt_pure_${target.id}`,
+    options: shuffleArray(options),
+  };
+}
+
+/**
  * Gets a random question, optionally filtering by level or type
  */
 export function getRandomQuizQuestion(
   hskFilter?: HskLevel | 'ALL',
   typeFilter?: 'ALL' | 'fill_blank' | 'order_words' | 'false_friends' | 'hanzi_recognition',
-  excludeIds?: string[]
+  excludeIds?: string[],
+  allWordsPool?: Word[]
 ): QuizQuestion {
+  // If Hanzi Puro is requested and allWordsPool is provided, dynamically generate from the complete words list
+  if (typeFilter === 'hanzi_recognition' && allWordsPool && allWordsPool.length > 0) {
+    return generatePureHanziQuestionFromWords(allWordsPool, excludeIds);
+  }
+
   let pool = CURATED_QUIZ_QUESTIONS;
 
   if (hskFilter && hskFilter !== 'ALL') {
@@ -1427,6 +1500,13 @@ export function getRandomQuizQuestion(
     }
   }
 
+  if (pool.length === 0) {
+    if (allWordsPool && allWordsPool.length > 0) {
+      return generatePureHanziQuestionFromWords(allWordsPool, excludeIds);
+    }
+    pool = CURATED_QUIZ_QUESTIONS;
+  }
+
   const randomIndex = Math.floor(Math.random() * pool.length);
   const selected = { ...pool[randomIndex] };
 
@@ -1437,4 +1517,5 @@ export function getRandomQuizQuestion(
 
   return selected;
 }
+
 

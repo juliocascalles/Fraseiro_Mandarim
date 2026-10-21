@@ -14,7 +14,7 @@ import {
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
-  Hash, LogOut, Flame, AlertTriangle
+  Hash, LogOut, Flame, AlertTriangle, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -101,6 +101,7 @@ const WORDS: Word[] = [
   { id: 'chifan', label: 'chīfàn', hanzi: '吃饭', translation: 'comer / fazer refeição', category: 'verb', icon: Utensils, hskLevel: 'HSK 1' },
   { id: 'jin', label: 'jin', hanzi: '进', translation: 'entrar', category: 'verb', icon: ArrowRight, hskLevel: 'HSK 2' },
   { id: 'gan', label: 'gàn', hanzi: '干', translation: 'fazer / realizar (ação direta)', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
+  { id: 'gan_dare', label: 'gǎn', hanzi: '敢', translation: 'ousar / atrever-se / fazer', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'mai', label: 'mǎi', hanzi: '买', translation: 'comprar', category: 'verb', icon: Coins, hskLevel: 'HSK 1' },
   { id: 'yong_verb', label: 'yòng', hanzi: '用', translation: 'usar / utilizar / por meio de', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'xie', label: 'xiě', hanzi: '写', translation: 'escrever', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
@@ -204,6 +205,7 @@ const WORDS: Word[] = [
   { id: 'wangqiu', label: 'wǎngqiú', hanzi: '网球', translation: 'tênis', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
   { id: 'bangqiu', label: 'bàngqiú', hanzi: '棒球', translation: 'beisebol', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
   { id: 'pingpangqiu', label: 'pīngpāngqiú', hanzi: '乒乓球', translation: 'ping-pong / tênis de mesa', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
+  { id: 'zhoumo', label: 'zhōumò', hanzi: '周末', translation: 'fim de semana', category: 'noun', icon: Calendar, hskLevel: 'HSK 2' },
 
   // Things (Coisas)
   { id: 'shu', label: 'shu', hanzi: '书', translation: 'livro', category: 'thing', icon: Book, hskLevel: 'HSK 1' },
@@ -451,6 +453,8 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'zuotian': 'zuotian',
   'ming tian': 'mingtian',
   'mingtian': 'mingtian',
+  'zhou mo': 'zhoumo',
+  'zhoumo': 'zhoumo',
   'mei tian': 'meitian',
   'meitian': 'meitian',
   'yin tian': 'yintian',
@@ -533,6 +537,8 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'qian_num') return 'qian';
     if (w.id === 'wan_num') return 'wan_num';
     if (w.id === 'wan') return 'wan';
+    if (w.id === 'gan_dare') return 'gan';
+    if (w.id === 'zhoumo') return 'zhoumo';
     if (w.id === 'ge_class') return 'ge';
     if (w.id === 'na_dem') return 'na';
     if (w.id === 'nali_there') return 'nali';
@@ -838,11 +844,23 @@ function getNaturalTranslation(seq: Word[]): string {
     'wo gei ni mai le yi ge dangao': 'Eu comprei um bolo para você.',
     'wo gei ni mai dangao': 'Eu compro bolo para você.',
 
-    // 8: Verbo GAN (干)
+    // 8: Verbo GAN (干 / 敢)
     'tamen gan shenme': 'O que eles estão fazendo?',
     'ta men gan shenme': 'O que eles estão fazendo?',
     'ni gan shenme': 'O que você está fazendo?',
     'kan ditu gan shenme': 'Olhando o mapa... para quê? / Por que olhar o mapa?',
+    'zhou mo ni gan shen me le': 'O que você fez no fim de semana?',
+    'zhou mo ni gan shenme le': 'O que você fez no fim de semana?',
+    'zhoumo ni gan shen me le': 'O que você fez no fim de semana?',
+    'zhoumo ni gan shenme le': 'O que você fez no fim de semana?',
+    'ni zhou mo gan shen me le': 'O que você fez no fim de semana?',
+    'ni zhou mo gan shenme le': 'O que você fez no fim de semana?',
+    'ni zhoumo gan shen me le': 'O que você fez no fim de semana?',
+    'ni zhoumo gan shenme le': 'O que você fez no fim de semana?',
+    'zhou mo ni gan shen me': 'O que você vai fazer no fim de semana?',
+    'zhoumo ni gan shen me': 'O que você vai fazer no fim de semana?',
+    'ni zhou mo gan shen me': 'O que você vai fazer no fim de semana?',
+    'ni zhoumo gan shen me': 'O que você vai fazer no fim de semana?',
 
     // 9: Comparações com BI (比)
     'wo didi bi wo gao': 'Meu irmãozinho é mais alto que eu.',
@@ -1186,6 +1204,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.category === 'family') return true;
           // Can take plural (except for 'zhe' and 'na_dem')
           if (w.category === 'plural' && last.id !== 'zhe' && last.id !== 'na_dem') return true;
+          if (['zhoumo', 'jintian', 'zuotian', 'mingtian'].includes(w.id)) return true;
           if (['possessive', 'adverb', 'verb', 'adjective'].includes(w.category)) return true;
           if (['zenmeyang', 'duoda', 'ji', 'weishenme'].includes(w.id)) return true;
           if (w.id === 'zai') return true; // Gerund or location
@@ -1427,6 +1446,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         ].includes(w.id) || w.category === 'thing');
       }
 
+      if (last.id === 'gan' || last.id === 'gan_dare') {
+        return WORDS.filter(w => ['shenme', 'ma', 'ne', 'le'].includes(w.id) || ['thing', 'noun'].includes(w.category));
+      }
+
       // Default verb output (e.g. 'shi'): can follow with nouns, classifiers, countries, pronouns, family, questions, things, numbers, duoda
       return WORDS.filter(w => {
         if (last.id === 'shi' && w.id === 'ge_class') return true; // e.g. jintian shi ge qingtian
@@ -1466,7 +1489,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.category === 'country' && activeVerb?.id === 'shuo') {
             return !['baxi', 'jianada'].includes(w.id);
           }
-          if (last.id === 'shenme' && ['mingzi', 'gongzuo', 'difang'].includes(w.id)) return true;
+          if (last.id === 'shenme' && ['mingzi', 'gongzuo', 'difang', 'le', 'ne', 'ma'].includes(w.id)) return true;
           return ['noun', 'country', 'thing', 'family'].includes(w.category);
         });
       }
@@ -1555,6 +1578,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       // Sub-rules for nested noun compound combinations
       if (prev?.category === 'preposition' && prev.id === 'gei') {
         return WORDS.filter(w => ['da_call', 'fa_verb', 'shuo'].includes(w.id));
+      }
+
+      if (last.id === 'zhoumo') {
+        // 'zhoumo' (周末 - fim de semana): pode ser seguido de pronome (ni, wo, ta), família, verbos (gan, zuo, qu, etc.), advérbios ou partículas
+        return WORDS.filter(w => ['pronoun', 'family', 'verb', 'adverb', 'adjective'].includes(w.category) || ['zenmeyang', 'de', 'ma', 'ne', 'ba_part', 'gan', 'gan_dare', 'shenme', 'le'].includes(w.id));
       }
 
       if (last.id === 'difang') {
@@ -2684,20 +2712,20 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans p-4 md:p-8 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-slate-900 text-white font-sans p-2 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-start sm:justify-center">
       {/* Main App Container */}
-      <div className="w-full max-w-4xl bg-white text-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 border border-slate-100">
+      <div className="w-full max-w-5xl xl:max-w-6xl bg-white text-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 md:p-8 flex flex-col gap-5 sm:gap-6 border border-slate-100 my-auto">
         {/* Header with Navigation & Action Controls */}
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md">
-              <MessageSquare className="w-6 h-6" />
+            <div className="p-2 sm:p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md shrink-0">
+              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.10.20
+                  v1.2026.10.21
                 </span>
               </div>
               <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
@@ -2708,7 +2736,7 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Mode Switcher Tabs */}
-            <div className="flex items-center flex-wrap gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center overflow-x-auto max-w-full gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
               <button
                 id="tab-chat-btn"
                 onClick={() => setActiveTab('chat')}

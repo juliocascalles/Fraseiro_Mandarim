@@ -295,7 +295,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                 Flashcards Mnemônicos dos Hanzis
               </h2>
               <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-amber-200 uppercase tracking-wider">
-                12 Ideogramas • 3 Etapas
+                {HANZI_VISUAL_FLASHCARDS.length} Ideogramas • 3 Etapas
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
@@ -335,12 +335,12 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
         </div>
       </div>
 
-      {/* Progress & Quick Selection Ribbon of the 12 Characters */}
+      {/* Progress & Quick Selection Ribbon of Characters */}
       <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold text-slate-600 px-1 gap-2">
           <span className="flex items-center gap-1.5 text-slate-700">
             <Compass className="w-3.5 h-3.5 text-amber-600" />
-            Progresso nas 12 Palavras:
+            Progresso nos Ideogramas ({HANZI_VISUAL_FLASHCARDS.length}):
           </span>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
@@ -358,8 +358,8 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
           </div>
         </div>
 
-        {/* 12 Character Buttons Ribbon */}
-        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5 pt-1">
+        {/* Character Buttons Ribbon - NO hover tooltips that spoil pinyin/translation */}
+        <div className="grid grid-cols-4 sm:grid-cols-7 md:grid-cols-10 lg:grid-cols-13 gap-1.5 pt-1">
           {HANZI_VISUAL_FLASHCARDS.map((card, idx) => {
             const isSelected = idx === currentIndex;
             const cardProg = progress[card.id];
@@ -383,7 +383,6 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                     ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                 }`}
-                title={`${card.hanzi} (${card.pinyin}): ${card.translation}`}
               >
                 <span className="font-bold text-base sm:text-lg leading-tight tracking-wide font-serif">
                   {card.hanzi}

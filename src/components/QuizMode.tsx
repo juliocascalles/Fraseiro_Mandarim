@@ -42,7 +42,7 @@ export const QuizMode: React.FC<QuizModeProps> = ({
 
   // Current Question State
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion>(() => {
-    return getRandomQuizQuestion('ALL', 'ALL');
+    return getRandomQuizQuestion('ALL', 'ALL', [], allWords);
   });
 
   // User Response State
@@ -108,10 +108,10 @@ export const QuizMode: React.FC<QuizModeProps> = ({
     setActiveTip(null);
     setOrderErrorTip(null);
 
-    const nextQ = getRandomQuizQuestion(hsk, type, answeredQuestionIds);
+    const nextQ = getRandomQuizQuestion(hsk, type, answeredQuestionIds, allWords);
     setCurrentQuestion(nextQ);
     setupOrderTiles(nextQ);
-  }, [hskFilter, typeFilter, answeredQuestionIds, setupOrderTiles]);
+  }, [hskFilter, typeFilter, answeredQuestionIds, allWords, setupOrderTiles]);
 
   // Initialize order tiles when question changes to order_words
   useEffect(() => {

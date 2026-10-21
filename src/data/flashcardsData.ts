@@ -591,5 +591,51 @@ export const HANZI_VISUAL_FLASHCARDS: HanziVisualFlashcard[] = [
     },
     retentionTip: 'Formato de balança no sufixo (⚖️) = pesar dois lados = comparação, relativamente (bǐjiào)!',
     etymologyNote: '比 compara diretamente A e B (A 比 B); 比较 atua como "relativamente" ou verbo comparar.'
+  },
+
+  // 13. 看 (kàn) - 🫡
+  {
+    id: 'fc_kan',
+    hanzi: '看',
+    pinyin: 'kàn',
+    pinyinRaw: 'kan',
+    translation: 'ver / olhar',
+    emoji: '🫡',
+    hintPhrase: 'A mão cobre o sol para poder VER melhor, como uma viseira.',
+    hskLevel: 'HSK 1',
+    category: 'Verbo de Percepção',
+    visualDescription: 'A mão curvada (⺪/手) colocada sobre o olho (目) serve como uma viseira de guarda-sol para ver e focar o olhar.',
+    mnemonicStory: 'Olhe a composição do ideograma 看: na parte superior está uma mão (radical 手/⺪) curvada sobre a fronte, e na parte inferior está o olho (目). É o gesto de levar a mão à testa como uma viseira contra a luz do sol para poder enxergar e VER melhor ao longe: 看 (kàn)!',
+    distractorPinyins: ['tīng', 'shuō', 'xiǎng'],
+    distractorOptions: [
+      { pinyin: 'tīng', translation: 'ouvir / escutar', pinyinRaw: 'ting' },
+      { pinyin: 'shuō', translation: 'falar / dizer', pinyinRaw: 'shuo' },
+      { pinyin: 'xiǎng', translation: 'pensar / desejar', pinyinRaw: 'xiang' },
+    ],
+    components: [
+      {
+        part: '⺪ (手)',
+        pinyin: 'shǒu',
+        name: 'Mão como Viseira',
+        meaning: 'Mão sobre a testa fazendo sombra',
+        visualRole: 'A mão em concha cobrindo o sol',
+        color: 'from-amber-500 to-orange-500'
+      },
+      {
+        part: '目',
+        pinyin: 'mù',
+        name: 'Olho',
+        meaning: 'O olho atento fitando o horizonte',
+        visualRole: 'O olho mirando sob a viseira',
+        color: 'from-blue-500 to-indigo-600'
+      }
+    ],
+    exampleSentence: {
+      hanzi: '我看了一本很有意思的书。',
+      pinyin: 'Wǒ kànle yì běn hěn yǒu yìsi de shū.',
+      portuguese: 'Eu li / vi um livro muito interessante.'
+    },
+    retentionTip: 'Mão sobre o olho como viseira (🫡) = ver / olhar (kàn)!',
+    etymologyNote: 'Na etimologia clássica: 手 (mão) + 目 (olho) = olhar colocando a mão sobre os olhos.'
   }
 ];

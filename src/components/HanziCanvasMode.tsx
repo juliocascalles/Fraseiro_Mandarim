@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   PenTool, RotateCcw, Trash2, Eye, EyeOff, Volume2, 
   Sparkles, CheckCircle2, Award, BookOpen, Layers, 
-  ArrowRight, Search, ChevronRight, HelpCircle, Palette, Grid
+  ArrowRight, Search, ChevronRight, HelpCircle, Palette, Grid, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { HanziCharacter, Word } from '../types';
@@ -26,9 +26,8 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
   const [selectedCharacter, setSelectedCharacter] = useState<HanziCharacter>(HANZI_CHARACTERS[0]);
   const [activeStrokeStep, setActiveStrokeStep] = useState<number>(0);
 
-  // Custom Character Input / Search
+  // Single Unified Search Term (mesmo mecanismo do Dicionário)
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [customChar, setCustomChar] = useState<string>('');
 
   // Canvas Options
   const [gridStyle, setGridStyle] = useState<GridStyle>('mizige');
@@ -47,17 +46,67 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
   const isDrawingRef = useRef<boolean>(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Filter characters
-  const filteredCharacters = HANZI_CHARACTERS.filter((c) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      c.hanzi.includes(term) ||
-      c.pinyin.toLowerCase().includes(term) ||
-      c.translation.toLowerCase().includes(term) ||
-      c.category.toLowerCase().includes(term)
-    );
-  });
+  // Pool all available characters from presets + dictionary allWords
+  const allAvailableCharacters = useMemo<HanziCharacter[]>(() => {
+    const list: HanziCharacter[] = [...HANZI_CHARACTERS];
+    const existingHanzis = new Set(list.map((c) => c.hanzi));
+
+    allWords.forEach((w) => {
+      const chars: string[] = Array.from(w.hanzi);
+      chars.forEach((char: string) => {
+        if (!existingHanzis.has(char) && /[\u4e00-\u9fa5]/.test(char)) {
+          existingHanzis.add(char);
+          list.push({
+            id: `dict-${w.id}-${char}`,
+            hanzi: char,
+            pinyin: w.label,
+            translation: w.translation,
+            radical: 'Mandarim',
+            radicalMeaning: `Palavra: ${w.label} (${w.translation})`,
+            strokeCount: 6,
+            hskLevel: w.hskLevel || 'HSK 1',
+            category: w.category,
+            strokeOrderRule: '从上到下，从左到右 (De cima para baixo, da esquerda para a direita)',
+            strokes: [
+              { strokeNumber: 1, name: 'Início', type: 'heng', description: 'Traço inicial superior/esquerdo', directionGuide: 'De cima para baixo / Esquerda para direita' },
+              { strokeNumber: 2, name: 'Centro', type: 'shu', description: 'Estrutura e proporção central', directionGuide: 'Mantenha proporção no centro da grade' },
+              { strokeNumber: 3, name: 'Finalização', type: 'heng', description: 'Traço de fechamento ou apoio', directionGuide: 'Firmeza no traço final' }
+            ],
+            compoundWords: [
+              { hanzi: w.hanzi, pinyin: w.label, portuguese: w.translation }
+            ]
+          });
+        }
+      });
+    });
+
+    return list;
+  }, [allWords]);
+
+  // Filter characters using the exact dictionary search algorithm
+  const filteredCharacters = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return allAvailableCharacters;
+    return allAvailableCharacters.filter((c) => {
+      const matchesPinyin = c.pinyin.toLowerCase().includes(q);
+      const matchesHanzi = c.hanzi.includes(q);
+      const matchesTranslation = c.translation.toLowerCase().includes(q);
+      const matchesCategory = c.category.toLowerCase().includes(q);
+      const matchesId = c.id.toLowerCase().includes(q);
+      const matchesRadical = c.radical.toLowerCase().includes(q) || c.radicalMeaning.toLowerCase().includes(q);
+      return matchesPinyin || matchesHanzi || matchesTranslation || matchesCategory || matchesId || matchesRadical;
+    });
+  }, [allAvailableCharacters, searchTerm]);
+
+  // Detect if user typed a raw Hanzi character in the search bar
+  const typedHanzi = useMemo(() => {
+    const trimmed = searchTerm.trim();
+    if (trimmed.length > 0 && /[\u4e00-\u9fa5]/.test(trimmed)) {
+      const typedChars: string[] = Array.from(trimmed);
+      return typedChars.find((ch: string) => /[\u4e00-\u9fa5]/.test(ch)) || null;
+    }
+    return null;
+  }, [searchTerm]);
 
   // Setup / Redraw Canvas Background Grid and Character Guide
   const redrawCanvas = useCallback(() => {
@@ -259,14 +308,14 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
     }
   };
 
-  // Custom Character Search or Creation
-  const handleApplyCustomCharacter = (char: string) => {
+  // Select or dynamically create character to practice
+  const handleSelectCustomHanzi = (char: string) => {
     const trimmed = char.trim();
     if (!trimmed) return;
     const firstChar = trimmed[0];
 
-    // Check if in preset list
-    const found = HANZI_CHARACTERS.find((c) => c.hanzi === firstChar);
+    // Check if in preset or dictionary list
+    const found = allAvailableCharacters.find((c) => c.hanzi === firstChar);
     if (found) {
       setSelectedCharacter(found);
     } else {
@@ -292,42 +341,41 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
       };
       setSelectedCharacter(newChar);
     }
-    setCustomChar('');
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col gap-6">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-4 sm:gap-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-rose-600 font-semibold mb-1">
-            <PenTool className="w-5 h-5" />
+            <PenTool className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="text-xs uppercase tracking-wider font-bold">Oficina de Escrita & Caligrafia</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
             Modo Hanzi: Desenho & Ordem dos Traços
           </h1>
-          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
             Pratique o traçado dos caracteres chineses na tradicional grade 米字格 (Mǐzìgé). Aprenda a ordem dos traços (笔顺), memorize os radicais e treine tanto com guia de contorno quanto de memória!
           </p>
         </div>
       </div>
 
       {/* Main Studio Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         
         {/* Left 2 Cols: Interactive Drawing Board */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           
           {/* Active Character Identity Bar */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-4xl font-bold text-slate-900 shadow-xs">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-sm flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-3xl sm:text-4xl font-bold text-slate-900 shadow-xs shrink-0">
                 {selectedCharacter.hanzi}
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-slate-800">{selectedCharacter.pinyin}</span>
+                  <span className="text-lg sm:text-xl font-bold text-slate-800">{selectedCharacter.pinyin}</span>
                   <button
                     type="button"
                     onClick={() => speakMandarin(selectedCharacter.hanzi)}
@@ -429,7 +477,7 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
             </div>
 
             {/* The Drawing Canvas Container */}
-            <div className="relative touch-none select-none rounded-2xl overflow-hidden shadow-inner border-2 border-rose-200/80 bg-white">
+            <div className="relative touch-none select-none rounded-2xl overflow-hidden shadow-inner border-2 border-rose-200/80 bg-white max-w-full">
               <canvas
                 ref={canvasRef}
                 width={360}
@@ -441,7 +489,7 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
                 onTouchStart={startDrawing}
                 onTouchMove={draw}
                 onTouchEnd={stopDrawing}
-                className="cursor-crosshair block w-[320px] h-[320px] sm:w-[360px] sm:h-[360px]"
+                className="cursor-crosshair block w-[260px] h-[260px] min-[380px]:w-[300px] min-[380px]:h-[300px] sm:w-[340px] sm:h-[340px] md:w-[360px] md:h-[360px] max-w-full touch-none"
               />
             </div>
 
@@ -564,42 +612,50 @@ export const HanziCanvasMode: React.FC<HanziCanvasModeProps> = ({
         {/* Right Col: Character Library & Custom Practice Input */}
         <div className="flex flex-col gap-5">
           
-          {/* Custom Input & Search */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Escolher ou Digitar Caractere
-            </span>
-
-            {/* Type any character to practice */}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={customChar}
-                onChange={(e) => setCustomChar(e.target.value)}
-                maxLength={1}
-                placeholder="Digite 1 caractere (ex: 猫)..."
-                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-rose-500 font-bold text-center"
-              />
-              <button
-                type="button"
-                onClick={() => handleApplyCustomCharacter(customChar)}
-                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-              >
-                Praticar
-              </button>
+          {/* Unified Search Input (Mesmo mecanismo e busca do Dicionário) */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Pesquisar Caractere
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Pinyin, Hanzi ou Tradução
+              </span>
             </div>
 
-            {/* Filter preset characters */}
-            <div className="relative mt-1">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+            {/* Single Unified Search Bar */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Filtrar por pinyin, significado..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-rose-500"
+                placeholder="Pesquisar pinyin, hanzi ou tradução (ex: ni, 你, saber)..."
+                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 bg-slate-50/50 hover:bg-white transition-all"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer"
+                  title="Limpar pesquisa"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+
+            {/* If user typed a custom Hanzi character directly not present in list */}
+            {typedHanzi && !filteredCharacters.some((c) => c.hanzi === typedHanzi) && (
+              <button
+                type="button"
+                onClick={() => handleSelectCustomHanzi(typedHanzi)}
+                className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold hover:bg-rose-100 transition-colors cursor-pointer"
+              >
+                <span>Praticar caractere digitado: <strong className="text-sm">{typedHanzi}</strong></span>
+                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold">Desenhar</span>
+              </button>
+            )}
           </div>
 
           {/* Character Library Grid */}

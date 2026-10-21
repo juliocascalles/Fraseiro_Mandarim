@@ -1386,5 +1386,30 @@ export const PRACTICE_CHALLENGES: PracticeChallenge[] = [
     categoryName: 'Culinária & Sabor',
     grammarNote: 'Item 16.2: "hǎohē" (好喝 - bom de beber) aplica-se exclusivamente a líquidos e bebidas. A negação é "bù hǎohē".',
   },
+
+  // 17. Atividades de Fim de Semana (周末 & 干 / 敢)
+  {
+    id: 'fras_17_1_zhoumo_gan_shenme_le',
+    portuguese: 'O que você fez no fim de semana?',
+    contextHint: 'Fim de semana (zhōumò) + você (nǐ) + fazer/ousar (gàn/gǎn) + o que (shénme) + completou (le)?',
+    targetPinyinList: [
+      'zhoumo ni gan shenme le',
+      'zhou mo ni gan shen me le',
+      'zhoumo ni gan shen me le',
+      'ni zhoumo gan shenme le',
+      'ni zhou mo gan shen me le',
+    ],
+    targetHanzi: '周末你干什么了？',
+    targetHanziList: [
+      '周末你干什么了',
+      '周末你敢什么了',
+      '你周末干什么了',
+      '你周末敢什么了',
+    ],
+    hskLevel: 'HSK 2',
+    category: 'shopping_prices',
+    categoryName: 'Rotina & Fim de Semana',
+    grammarNote: 'Item 17.1: "zhōumò" (周末 - fim de semana) posiciona-se no início da frase ou logo após o sujeito. O verbo "gàn" (干) ou "gǎn" (敢) indica a ação de fazer, acompanhado da partícula de ação concluída "le" (了).',
+  },
 ];
 
