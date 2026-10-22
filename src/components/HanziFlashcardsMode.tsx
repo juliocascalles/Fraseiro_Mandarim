@@ -32,9 +32,10 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
   onOpenCanvasWithChar,
   onSendToBuilder,
 }) => {
-  // Deck and Shuffling State
-  const [deck, setDeck] = useState<HanziVisualFlashcard[]>(HANZI_VISUAL_FLASHCARDS);
-  const [isShuffled, setIsShuffled] = useState<boolean>(false);
+  // Deck and Shuffling State: Embaralhar os flashcards toda vez que abrir o app (Req 1)
+  const [deck, setDeck] = useState<HanziVisualFlashcard[]>(() => {
+    return [...HANZI_VISUAL_FLASHCARDS].sort(() => Math.random() - 0.5);
+  });
 
   // Navigation
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -48,12 +49,11 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
   const [wrongAttempts, setWrongAttempts] = useState<string[]>([]);
   const [flipState, setFlipState] = useState<boolean>(false);
 
-  // Keep deck in sync if base list updates and not in custom shuffle
+  // Embaralhar sempre no carregamento inicial da aplicação / tela
   useEffect(() => {
-    if (!isShuffled) {
-      setDeck(HANZI_VISUAL_FLASHCARDS);
-    }
-  }, [isShuffled]);
+    setDeck([...HANZI_VISUAL_FLASHCARDS].sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+  }, []);
 
   // Overall user progress
   const [progress, setProgress] = useState<FlashcardProgress>(() => {
@@ -84,21 +84,36 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
     setFlipState(false);
   }, []);
 
-  // Shuffle & Reset deck handlers
+  // Shuffle deck handler (sem botão Restaurar Ordem - Req 1.1)
   const handleShuffleDeck = useCallback(() => {
     const shuffled = [...HANZI_VISUAL_FLASHCARDS].sort(() => Math.random() - 0.5);
     setDeck(shuffled);
-    setIsShuffled(true);
     setCurrentIndex(0);
     resetCardInteractiveState();
   }, [resetCardInteractiveState]);
 
-  const handleResetDeckOrder = useCallback(() => {
-    setDeck(HANZI_VISUAL_FLASHCARDS);
-    setIsShuffled(false);
-    setCurrentIndex(0);
-    resetCardInteractiveState();
-  }, [resetCardInteractiveState]);
+  // Req 2: Com a "Biblioteca 3D", virar um flashcard é o mesmo que clicar em "Mostrar Dica do Desenho"
+  const handleFlipCardIn3D = useCallback(() => {
+    setFlipState(prev => {
+      const next = !prev;
+      if (next) {
+        // Virar o cartão equivale a acionar a dica do desenho
+        setShowHint(true);
+        setProgress(p => {
+          const currentProg = p[activeCard.id];
+          return {
+            ...p,
+            [activeCard.id]: {
+              status: currentProg?.status === 'first_try' ? 'first_try' : 'with_hint',
+              attempts: currentProg?.attempts || 0,
+              usedHint: true,
+            }
+          };
+        });
+      }
+      return next;
+    });
+  }, [activeCard.id]);
 
   // Generate options for the current card (1 correct + 3 distractors with pinyin and translation)
   const pinyinOptions = useMemo(() => {
@@ -324,12 +339,10 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-amber-200 uppercase tracking-wider">
                 {deck.length} Ideogramas • 3 Etapas
               </span>
-              {isShuffled && (
-                <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1">
-                  <Shuffle className="w-3 h-3 text-purple-600" />
-                  Ordem Embaralhada
-                </span>
-              )}
+              <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1">
+                <Shuffle className="w-3 h-3 text-purple-600" />
+                Ordem Embaralhada
+              </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
               Veja primeiro somente o caractere chinês (Hanzi), selecione o pinyin e use a imagem mnemônica como dica!
@@ -339,19 +352,15 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
 
         {/* View Mode Switcher & Shuffle Control */}
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          {/* Shuffle Toggle Button */}
+          {/* Shuffle Button (Req 1 & 1.1: Embaralhar cards, sem Restaurar Ordem) */}
           <button
             type="button"
-            onClick={isShuffled ? handleResetDeckOrder : handleShuffleDeck}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
-              isShuffled
-                ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-xs'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-            }`}
-            title={isShuffled ? 'Restaurar ordem original' : 'Embaralhar todos os flashcards aleatoriamente'}
+            onClick={handleShuffleDeck}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs border bg-purple-600 hover:bg-purple-700 text-white border-purple-500 active:scale-95"
+            title="Embaralhar todos os flashcards aleatoriamente"
           >
             <Shuffle className="w-3.5 h-3.5" />
-            <span>{isShuffled ? 'Restaurar Ordem' : 'Embaralhar Cards'}</span>
+            <span>Embaralhar Cards</span>
           </button>
 
           <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -393,17 +402,15 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               <Compass className="w-3.5 h-3.5 text-amber-600" />
               Progresso nos Ideogramas ({deck.length}):
             </span>
-            {isShuffled && (
-              <button
-                type="button"
-                onClick={handleShuffleDeck}
-                className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 underline cursor-pointer flex items-center gap-0.5"
-                title="Embaralhar novamente a sequência"
-              >
-                <Shuffle className="w-3 h-3" />
-                re-embaralhar
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleShuffleDeck}
+              className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 underline cursor-pointer flex items-center gap-0.5"
+              title="Embaralhar novamente a sequência"
+            >
+              <Shuffle className="w-3 h-3" />
+              re-embaralhar
+            </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
@@ -930,16 +937,28 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
         /* ============================================================ */
         <div className="flex flex-col items-center gap-4 w-full">
           <div 
-            className="w-full max-w-2xl min-h-[460px] perspective-1000 cursor-pointer select-none"
-            onClick={() => setFlipState(prev => !prev)}
+            className="w-full max-w-2xl min-h-[480px] perspective-1000 cursor-pointer select-none"
+            style={{ perspective: 1000, WebkitPerspective: 1000 }}
+            onClick={handleFlipCardIn3D}
           >
             <motion.div
-              className="w-full h-full relative rounded-3xl transition-transform duration-500 transform-style-3d shadow-xl"
+              className="w-full h-full min-h-[480px] relative rounded-3xl transform-style-3d shadow-xl"
+              style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' }}
               animate={{ rotateY: flipState ? 180 : 0 }}
               transition={{ duration: 0.55, ease: 'easeInOut' }}
             >
               {/* FRONT: Primeiro somente o caractere (Hanzi) */}
-              <div className="absolute inset-0 backface-hidden w-full h-full rounded-3xl p-6 sm:p-8 flex flex-col justify-between border-2 border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-rose-50/30">
+              <div 
+                className="absolute inset-0 backface-hidden w-full h-full rounded-3xl p-6 sm:p-8 flex flex-col justify-between border-2 border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-rose-50/30"
+                style={{
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  transform: 'rotateY(0deg)',
+                  WebkitTransform: 'rotateY(0deg)',
+                  zIndex: flipState ? 0 : 20,
+                  pointerEvents: flipState ? 'none' : 'auto',
+                }}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] uppercase">
@@ -953,7 +972,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   <button
                     type="button"
                     onClick={(e) => handlePlayAudio(activeCard.hanzi, e)}
-                    className="p-2 rounded-xl bg-white hover:bg-amber-100 border border-slate-200 text-amber-700 shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-amber-100 border border-slate-200 text-amber-700 shadow-2xs cursor-pointer"
                   >
                     <Volume2 className="w-4 h-4" />
                   </button>
@@ -985,19 +1004,29 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               </div>
 
               {/* BACK: Imagem Mnemônica (Dica), Pinyin, Tradução e Radicais */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 w-full h-full rounded-3xl p-6 sm:p-7 flex flex-col justify-between border-2 border-amber-400 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
+              <div 
+                className="absolute inset-0 backface-hidden rotate-y-180 w-full h-full rounded-3xl p-6 sm:p-7 flex flex-col justify-between border-2 border-amber-400 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl"
+                style={{
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)',
+                  WebkitTransform: 'rotateY(180deg)',
+                  zIndex: flipState ? 20 : 0,
+                  pointerEvents: flipState ? 'auto' : 'none',
+                }}
+              >
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-3xl drop-shadow-sm select-none" role="img" aria-label="Visual mnemonic">
                       {activeCard.emoji}
                     </span>
-                    <span className="text-2xl font-bold font-serif text-amber-300">
+                    <span className="text-3xl font-black font-serif text-amber-300">
                       {activeCard.hanzi}
                     </span>
-                    <span className="font-mono text-sm text-amber-200 bg-white/10 px-2 py-0.5 rounded-lg">
+                    <span className="font-mono text-base font-bold text-amber-200 bg-white/10 px-2.5 py-0.5 rounded-lg">
                       {activeCard.pinyin}
                     </span>
-                    <span className="text-xs text-slate-300 truncate">
+                    <span className="text-sm font-semibold text-slate-200 truncate">
                       — {activeCard.translation}
                     </span>
                   </div>
@@ -1005,17 +1034,35 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   <button
                     type="button"
                     onClick={(e) => handlePlayAudio(activeCard.hanzi, e)}
-                    className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300"
+                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 cursor-pointer transition-colors"
+                    title="Ouvir áudio"
                   >
                     <Volume2 className="w-4 h-4" />
                   </button>
                 </div>
 
                 <div className="flex flex-col gap-3 my-2 overflow-y-auto max-h-[300px] pr-1">
+                  {/* Dica da Imagem / Desenho Mnemônico em destaque */}
+                  <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-amber-500/10 border-2 border-amber-400/40 p-3 rounded-2xl flex items-center gap-3 shadow-sm">
+                    <span className="text-4xl drop-shadow-md shrink-0" role="img" aria-label="Visual hint">
+                      {activeCard.emoji}
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                        <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                        Dica Visual da Imagem Mnemônica
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-white leading-snug">
+                        {activeCard.visualDescription}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Desenho e Mnemônica */}
                   <div className="bg-white/5 border border-white/10 p-3 rounded-2xl">
                     <div className="flex items-center gap-1.5 text-amber-400 font-extrabold text-xs uppercase mb-1">
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Desenho e Mnemônica</span>
+                      <span>Como o ideograma desenha a ideia</span>
                     </div>
                     <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
                       {activeCard.mnemonicStory}
@@ -1053,7 +1100,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handlePlayAudio(activeCard.exampleSentence.hanzi, e)}
-                      className="p-1.5 rounded-xl bg-white/10 text-amber-300 shrink-0 ml-2"
+                      className="p-1.5 rounded-xl bg-white/10 text-amber-300 shrink-0 ml-2 cursor-pointer hover:bg-white/20 transition-colors"
                     >
                       <Volume2 className="w-4 h-4" />
                     </button>
@@ -1066,8 +1113,11 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setFlipState(false)}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFlipState(false);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs cursor-pointer transition-colors"
                   >
                     Virar Frente
                   </button>
@@ -1089,7 +1139,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
 
             <button
               type="button"
-              onClick={() => setFlipState(prev => !prev)}
+              onClick={handleFlipCardIn3D}
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />

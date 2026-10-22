@@ -206,6 +206,9 @@ const WORDS: Word[] = [
   { id: 'bangqiu', label: 'bàngqiú', hanzi: '棒球', translation: 'beisebol', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
   { id: 'pingpangqiu', label: 'pīngpāngqiú', hanzi: '乒乓球', translation: 'ping-pong / tênis de mesa', category: 'noun', icon: Target, hskLevel: 'HSK 2' },
   { id: 'zhoumo', label: 'zhōumò', hanzi: '周末', translation: 'fim de semana', category: 'noun', icon: Calendar, hskLevel: 'HSK 2' },
+  { id: 'gongyuan', label: 'gōngyuán', hanzi: '公园', translation: 'parque', category: 'noun', icon: Compass, hskLevel: 'HSK 2' },
+  { id: 'haizi', label: 'háizi', hanzi: '孩子', translation: 'criança / filho(a)', category: 'family', icon: Smile, hskLevel: 'HSK 2' },
+  { id: 'haizimen', label: 'háizimen', hanzi: '孩子们', translation: 'crianças', category: 'family', icon: Users, hskLevel: 'HSK 2' },
 
   // Things (Coisas)
   { id: 'shu', label: 'shu', hanzi: '书', translation: 'livro', category: 'thing', icon: Book, hskLevel: 'HSK 1' },
@@ -499,6 +502,12 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'zhaopian': 'zhaopian',
   'ci dian': 'cidian',
   'cidian': 'cidian',
+  'gong yuan': 'gongyuan',
+  'gongyuan': 'gongyuan',
+  'hai zi': 'haizi',
+  'haizi': 'haizi',
+  'hai zi men': 'haizimen',
+  'haizimen': 'haizimen',
 };
 
 // Helper for natural/fluent idiomatic translation of Mandarin phrases to Portuguese
@@ -542,6 +551,11 @@ function getNaturalTranslation(seq: Word[]): string {
     if (w.id === 'ge_class') return 'ge';
     if (w.id === 'na_dem') return 'na';
     if (w.id === 'nali_there') return 'nali';
+    if (w.id === 'gongyuan') return 'gong yuan';
+    if (w.id === 'haizi') return 'hai zi';
+    if (w.id === 'haizimen') return 'hai zi men';
+    if (w.id === 'youyisi') return 'you yisi';
+    if (w.id === 'xiezi') return 'xie zi';
     return w.id;
   }).join(' ');
 
@@ -925,6 +939,18 @@ function getNaturalTranslation(seq: Word[]): string {
     'kele bu haohe': 'Coca-Cola não tem gosto bom.',
     'kafei hen hao he': 'Café é muito gostoso de beber.',
     'cha hen hao he': 'Chá é muito saboroso de beber.',
+
+    // Novas Frases de Prática (v1.2026.10.22):
+    'ni xiang na ge dianying you yisi ma': 'Você acha aquele filme interessante?',
+    'ni xiang na ge dianying youyisi ma': 'Você acha aquele filme interessante?',
+    'wo yong yi zhi bi xie zi': 'Eu uso uma caneta para escrever.',
+    'wo yong yi zhi bi xiezi': 'Eu uso uma caneta para escrever ideogramas.',
+    'wo yong yi zhi bi xie': 'Eu escrevo com uma caneta.',
+    'wo yong zhi bi xie zi': 'Eu uso uma caneta para escrever.',
+    'haizimen xihuan zai gongyuan wan': 'Crianças gostam de brincar no parque.',
+    'haizimen xihuan zai gongyuan wanr': 'Crianças gostam de brincar no parque.',
+    'haizi men xihuan zai gong yuan wan': 'Crianças gostam de brincar no parque.',
+    'haizi men xihuan zai gong yuan wanr': 'Crianças gostam de brincar no parque.',
   };
 
   // Regra especial: se a frase termina com 'wo jiao' (我叫), colocar o nome do usuário na frente
@@ -1167,6 +1193,15 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
         return WORDS.filter(w => w.category === 'adjective');
       }
 
+      // Demonstratives (zhe / na_dem): can be followed by classifiers, things, nouns, adverbs or verbs
+      if (last.id === 'zhe' || last.id === 'na_dem') {
+        return WORDS.filter(w => {
+          if (w.category === 'classifier' || w.category === 'thing' || w.category === 'noun' || w.id === 'duoshao' || w.id === 'shi') return true;
+          if (['adverb', 'verb', 'adjective'].includes(w.category)) return true;
+          return false;
+        });
+      }
+
       // If a verb exists in the sequence (Pronoun as Object, or Embedded Clause Subject after xiang)
       if (verbExists) {
         // If preceded by xiang (ex: wo xiang ni... -> wo xiang ni shi baxi ren / wo xiang ni)
@@ -1368,7 +1403,7 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       if (last.id === 'xihuan') {
         const subjectPronoun = sequence.find(w => w.category === 'pronoun');
         return WORDS.filter(w => {
-          if (['chi', 'he', 'wan', 'paobu', 'youyong_swim', 'da_sport', 'kan', 'xuexi'].includes(w.id)) return true;
+          if (['chi', 'he', 'wan', 'paobu', 'youyong_swim', 'da_sport', 'kan', 'xuexi', 'zai'].includes(w.id)) return true;
           if (['thing', 'family'].includes(w.category)) return true;
           if (w.category === 'question') return ['shei', 'shenme'].includes(w.id);
           if (w.category === 'pronoun' && w.id !== subjectPronoun?.id && w.id !== 'zhe') return true;
@@ -1399,10 +1434,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       if (last.id === 'zai') {
         // 'zai' (在 - gerúndio 'estar fazendo' OU preposição de lugar 'em'):
         // 1. Gerúndio: zai + xiang / kan / xuexi / gongzuo / shuo / da_call / he / chi / zuo
-        // 2. Lugar: zai + zhongguo / gongsi / xuexiao / daxue / chaoshi / jia / difang / nar / nali / países
+        // 2. Lugar: zai + zhongguo / gongsi / xuexiao / daxue / chaoshi / jia / difang / nar / nali / gongyuan / países
         return WORDS.filter(w => {
           if (['xiang', 'kan', 'xuexi', 'gongzuo', 'shuo', 'da_call', 'he', 'chi', 'zuo'].includes(w.id)) return true;
-          if (['zhongguo', 'gongsi', 'xuexiao', 'daxue', 'chaoshi', 'jia', 'difang', 'nali', 'nar', 'nali_there'].includes(w.id)) return true;
+          if (['zhongguo', 'gongsi', 'xuexiao', 'daxue', 'chaoshi', 'jia', 'difang', 'nali', 'nar', 'nali_there', 'gongyuan'].includes(w.id)) return true;
           if (w.category === 'country') return true;
           return false;
         });
@@ -1448,6 +1483,19 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
 
       if (last.id === 'gan' || last.id === 'gan_dare') {
         return WORDS.filter(w => ['shenme', 'ma', 'ne', 'le'].includes(w.id) || ['thing', 'noun'].includes(w.category));
+      }
+
+      if (last.id === 'yong_verb') {
+        // 'yong' (用 - usar / com instrumento): seguido de número (yi, liang), classificador (zhi_class), coisas (bi, gangbi, shouji, kuaizi), substantivos
+        return WORDS.filter(w => ['yi', 'liang', 'zhi_class', 'bi', 'gangbi', 'shouji', 'kuaizi', 'shenme'].includes(w.id) || ['thing', 'number', 'classifier'].includes(w.category));
+      }
+
+      if (last.id === 'xie') {
+        return WORDS.filter(w => ['zi', 'hanyu', 'zhongwen', 'yingwen', 'puwen', 'mingzi', 'youjian', 'shu', 'ma', 'ba_part', 'ne'].includes(w.id) || ['thing', 'noun'].includes(w.category));
+      }
+
+      if (last.id === 'xiezi') {
+        return WORDS.filter(w => ['ma', 'ba_part', 'ne', 'le'].includes(w.id));
       }
 
       // Default verb output (e.g. 'shi'): can follow with nouns, classifiers, countries, pronouns, family, questions, things, numbers, duoda
@@ -1513,6 +1561,12 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           if (w.id === 'ren') return true;
           return false;
         });
+      }
+      if (last.id === 'zhi_class') {
+        return WORDS.filter(w => ['bi', 'gangbi'].includes(w.id) || w.category === 'thing');
+      }
+      if (last.id === 'ben') {
+        return WORDS.filter(w => ['shu', 'cidian'].includes(w.id) || w.category === 'thing');
       }
       if (last.id === 'sui') {
         return WORDS.filter(w => w.id === 'ma' || w.id === 'ba_part');
@@ -1616,6 +1670,21 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
       if (last.id === 'gongzuo') {
         return WORDS.filter(w => w.id === 'zenmeyang' || w.category === 'adjective' || w.category === 'verb');
+      }
+
+      if (last.id === 'gongyuan') {
+        // 'gongyuan' (公园 - parque): seguido de ações (wan, paobu, youyong_swim, kan, xuexi, chifan), ou partículas
+        return WORDS.filter(w => ['wan', 'paobu', 'kan', 'xuexi', 'chifan', 'ma', 'ba_part', 'ne', 'zenmeyang'].includes(w.id) || w.category === 'verb');
+      }
+
+      if (last.id === 'bi' || last.id === 'gangbi') {
+        // bi / gangbi seguido da ação instrumental (xie, xiezi), adjetivos, partículas
+        return WORDS.filter(w => ['xie', 'xiezi', 'ma', 'ba_part', 'ne', 'zenmeyang'].includes(w.id) || w.category === 'adjective' || w.category === 'verb');
+      }
+
+      if (last.id === 'dianying') {
+        // 'dianying' (电影 - filme): seguido de avaliação (youyisi, meiyisi, hao, etc.), advérbio (hen, bu, feichang), verbo (kan) ou partículas
+        return WORDS.filter(w => ['youyisi', 'meiyisi', 'kan', 'hen', 'bu', 'feichang', 'zenmeyang', 'ma', 'ba_part', 'ne'].includes(w.id) || w.category === 'adjective');
       }
 
       // If number selected (e.g. si, liang, er, san, wu, shi_num, jiu, bai...):
@@ -2725,11 +2794,11 @@ export default function App() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.10.21
+                  v1.2026.10.22
                 </span>
               </div>
-              <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest">
-                Sentencing Logic Engine & Practice Platform
+              <p className="text-[11px] text-slate-500 font-semibold tracking-wide">
+                Converse em mandarim enquanto aprende
               </p>
             </div>
           </div>
