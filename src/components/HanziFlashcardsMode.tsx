@@ -4,7 +4,7 @@ import {
   Check, Lightbulb, Compass, Flag,
   HelpCircle, ArrowRight, Star, CheckCircle2,
   X, PenTool, PlusSquare, BookOpen, Layers,
-  RefreshCw, Smile, Award
+  RefreshCw, Smile, Award, Shuffle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { HanziVisualFlashcard, Word } from '../types';
@@ -32,6 +32,10 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
   onOpenCanvasWithChar,
   onSendToBuilder,
 }) => {
+  // Deck and Shuffling State
+  const [deck, setDeck] = useState<HanziVisualFlashcard[]>(HANZI_VISUAL_FLASHCARDS);
+  const [isShuffled, setIsShuffled] = useState<boolean>(false);
+
   // Navigation
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [activeTabMode, setActiveTabMode] = useState<'interactive_steps' | 'free_flip'>('interactive_steps');
@@ -44,6 +48,13 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
   const [wrongAttempts, setWrongAttempts] = useState<string[]>([]);
   const [flipState, setFlipState] = useState<boolean>(false);
 
+  // Keep deck in sync if base list updates and not in custom shuffle
+  useEffect(() => {
+    if (!isShuffled) {
+      setDeck(HANZI_VISUAL_FLASHCARDS);
+    }
+  }, [isShuffled]);
+
   // Overall user progress
   const [progress, setProgress] = useState<FlashcardProgress>(() => {
     try {
@@ -54,7 +65,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
     }
   });
 
-  const activeCard: HanziVisualFlashcard = HANZI_VISUAL_FLASHCARDS[currentIndex] || HANZI_VISUAL_FLASHCARDS[0];
+  const activeCard: HanziVisualFlashcard = deck[currentIndex] || deck[0] || HANZI_VISUAL_FLASHCARDS[0];
 
   // Save progress
   useEffect(() => {
@@ -62,6 +73,32 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
       localStorage.setItem('hanzi_flashcards_progress_v2', JSON.stringify(progress));
     } catch {}
   }, [progress]);
+
+  // Reset interactive state when card index changes
+  const resetCardInteractiveState = useCallback(() => {
+    setSelectedOption(null);
+    setIsCorrect(null);
+    setShowHint(false);
+    setIsRevealed(false);
+    setWrongAttempts([]);
+    setFlipState(false);
+  }, []);
+
+  // Shuffle & Reset deck handlers
+  const handleShuffleDeck = useCallback(() => {
+    const shuffled = [...HANZI_VISUAL_FLASHCARDS].sort(() => Math.random() - 0.5);
+    setDeck(shuffled);
+    setIsShuffled(true);
+    setCurrentIndex(0);
+    resetCardInteractiveState();
+  }, [resetCardInteractiveState]);
+
+  const handleResetDeckOrder = useCallback(() => {
+    setDeck(HANZI_VISUAL_FLASHCARDS);
+    setIsShuffled(false);
+    setCurrentIndex(0);
+    resetCardInteractiveState();
+  }, [resetCardInteractiveState]);
 
   // Generate options for the current card (1 correct + 3 distractors with pinyin and translation)
   const pinyinOptions = useMemo(() => {
@@ -90,7 +127,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
         isCorrect: false,
       }));
     } else {
-      const otherCards = HANZI_VISUAL_FLASHCARDS.filter(c => c.id !== activeCard.id)
+      const otherCards = deck.filter(c => c.id !== activeCard.id)
         .sort(() => 0.5 - Math.random())
         .slice(0, 3);
       chosenDistractors = otherCards.map((c, idx) => ({
@@ -103,17 +140,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
     }
 
     return [correctOption, ...chosenDistractors].sort(() => 0.5 - Math.random());
-  }, [activeCard.id, activeCard.pinyin, activeCard.pinyinRaw, activeCard.translation, activeCard.distractorOptions]);
-
-  // Reset interactive state when card index changes
-  const resetCardInteractiveState = useCallback(() => {
-    setSelectedOption(null);
-    setIsCorrect(null);
-    setShowHint(false);
-    setIsRevealed(false);
-    setWrongAttempts([]);
-    setFlipState(false);
-  }, []);
+  }, [activeCard.id, activeCard.pinyin, activeCard.pinyinRaw, activeCard.translation, activeCard.distractorOptions, deck]);
 
   useEffect(() => {
     resetCardInteractiveState();
@@ -121,20 +148,20 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
 
   // Navigation handlers
   const handleNext = useCallback(() => {
-    if (currentIndex < HANZI_VISUAL_FLASHCARDS.length - 1) {
+    if (currentIndex < deck.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
       setCurrentIndex(0);
     }
-  }, [currentIndex]);
+  }, [currentIndex, deck.length]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
     } else {
-      setCurrentIndex(HANZI_VISUAL_FLASHCARDS.length - 1);
+      setCurrentIndex(deck.length - 1);
     }
-  }, [currentIndex]);
+  }, [currentIndex, deck.length]);
 
   // STEP 1: Handle Selecting Pinyin
   const handleSelectPinyin = (option: typeof pinyinOptions[0]) => {
@@ -295,53 +322,89 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                 Flashcards Mnemônicos dos Hanzis
               </h2>
               <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-amber-200 uppercase tracking-wider">
-                {HANZI_VISUAL_FLASHCARDS.length} Ideogramas • 3 Etapas
+                {deck.length} Ideogramas • 3 Etapas
               </span>
+              {isShuffled && (
+                <span className="bg-purple-100 text-purple-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1">
+                  <Shuffle className="w-3 h-3 text-purple-600" />
+                  Ordem Embaralhada
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-              Associe o desenho do caractere ao seu significado em 3 etapas interativas com dicas mnemônicas!
+              Veja primeiro somente o caractere chinês (Hanzi), selecione o pinyin e use a imagem mnemônica como dica!
             </p>
           </div>
         </div>
 
-        {/* View Mode Switcher */}
-        <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs self-start sm:self-auto">
+        {/* View Mode Switcher & Shuffle Control */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {/* Shuffle Toggle Button */}
           <button
             type="button"
-            onClick={() => setActiveTabMode('interactive_steps')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTabMode === 'interactive_steps'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+            onClick={isShuffled ? handleResetDeckOrder : handleShuffleDeck}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
+              isShuffled
+                ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-xs'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
             }`}
-            title="Modo interativo em 3 etapas: adivinhar pinyin, pedir dica ou desistir"
+            title={isShuffled ? 'Restaurar ordem original' : 'Embaralhar todos os flashcards aleatoriamente'}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Modo Interativo (3 Etapas)</span>
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>{isShuffled ? 'Restaurar Ordem' : 'Embaralhar Cards'}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTabMode('free_flip')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTabMode === 'free_flip'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-            title="Explorar e virar os cartões livremente com análise completa dos traços"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Biblioteca 3D</span>
-          </button>
+
+          <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setActiveTabMode('interactive_steps')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTabMode === 'interactive_steps'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Modo interativo em 3 etapas: adivinhar pinyin, pedir dica ou desistir"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Modo Interativo (3 Etapas)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTabMode('free_flip')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTabMode === 'free_flip'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Explorar e virar os cartões livremente com análise completa dos traços"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Biblioteca 3D</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Progress & Quick Selection Ribbon of Characters */}
       <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold text-slate-600 px-1 gap-2">
-          <span className="flex items-center gap-1.5 text-slate-700">
-            <Compass className="w-3.5 h-3.5 text-amber-600" />
-            Progresso nos Ideogramas ({HANZI_VISUAL_FLASHCARDS.length}):
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-slate-700">
+              <Compass className="w-3.5 h-3.5 text-amber-600" />
+              Progresso nos Ideogramas ({deck.length}):
+            </span>
+            {isShuffled && (
+              <button
+                type="button"
+                onClick={handleShuffleDeck}
+                className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 underline cursor-pointer flex items-center gap-0.5"
+                title="Embaralhar novamente a sequência"
+              >
+                <Shuffle className="w-3 h-3" />
+                re-embaralhar
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -358,9 +421,9 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
           </div>
         </div>
 
-        {/* Character Buttons Ribbon - NO hover tooltips that spoil pinyin/translation */}
+        {/* Character Buttons Ribbon - Shows ONLY Hanzi first, emojis revealed upon attempt */}
         <div className="grid grid-cols-4 sm:grid-cols-7 md:grid-cols-10 lg:grid-cols-13 gap-1.5 pt-1">
-          {HANZI_VISUAL_FLASHCARDS.map((card, idx) => {
+          {deck.map((card, idx) => {
             const isSelected = idx === currentIndex;
             const cardProg = progress[card.id];
             const isFirstTry = cardProg?.status === 'first_try';
@@ -387,8 +450,12 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                 <span className="font-bold text-base sm:text-lg leading-tight tracking-wide font-serif">
                   {card.hanzi}
                 </span>
-                <span className="text-xs leading-none mt-0.5">
-                  {card.emoji}
+                <span className="text-xs leading-none mt-0.5 min-h-[14px] flex items-center justify-center">
+                  {isFirstTry || isWithHint || isRevealedCard ? (
+                    card.emoji
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 block" />
+                  )}
                 </span>
                 {isFirstTry && (
                   <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-xs">
@@ -429,7 +496,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   {activeCard.hskLevel}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  • Palavra {currentIndex + 1} de {HANZI_VISUAL_FLASHCARDS.length}
+                  • Palavra {currentIndex + 1} de {deck.length}
                 </span>
               </div>
 
@@ -459,27 +526,12 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               </div>
             </div>
 
-            {/* Central Area: ETAPA 1 - Hanzi SEM o Pinyin + Imagem/Desenho Mnemônico + Significado */}
-            <div className="flex flex-col items-center justify-center my-5 text-center gap-3">
+            {/* Central Area: ETAPA 1 - PRIMEIRO SOMENTE O CARACTERE (HANZI), IMAGEM DEPOIS COMO DICA */}
+            <div className="flex flex-col items-center justify-center my-6 text-center gap-3">
               
-              {/* Símbolo / Imagem Visual que relaciona o formato do caractere com o significado */}
-              <div className="flex items-center justify-center gap-3 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200/80 px-6 py-3.5 rounded-2xl shadow-xs">
-                <span className="text-4xl sm:text-5xl drop-shadow-sm select-none" role="img" aria-label="Visual mnemonic">
-                  {activeCard.emoji}
-                </span>
-                <div className="text-left">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
-                    Imagem Mnemônica do Formato
-                  </span>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
-                    {activeCard.visualDescription}
-                  </span>
-                </div>
-              </div>
-
-              {/* Hanzi mostrado SEM o Pinyin */}
+              {/* Hanzi mostrado SEM o Pinyin (isolado e em destaque) */}
               <div className="relative my-2">
-                <h1 className="text-7xl sm:text-8xl font-black text-slate-900 tracking-wider font-serif drop-shadow-xs select-none">
+                <h1 className="text-7xl sm:text-8xl md:text-9xl font-black text-slate-900 tracking-wider font-serif drop-shadow-xs select-none">
                   {activeCard.hanzi}
                 </h1>
                 
@@ -495,6 +547,38 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* IMAGEM MNEMÔNICA COMO DICA: aparece apenas quando solicitado como dica ou ao acertar/revelar */}
+              {(showHint || isCorrect || isRevealed) ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="flex items-center justify-center gap-3 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 px-6 py-3 rounded-2xl shadow-xs max-w-lg w-full"
+                >
+                  <span className="text-4xl sm:text-5xl drop-shadow-sm select-none" role="img" aria-label="Visual mnemonic">
+                    {activeCard.emoji}
+                  </span>
+                  <div className="text-left">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block flex items-center gap-1">
+                      <Lightbulb className="w-3 h-3 text-amber-600 inline" />
+                      Imagem Mnemônica (Dica Visual)
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
+                      {activeCard.visualDescription}
+                    </span>
+                  </div>
+                </motion.div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleTriggerHint}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-800 text-xs font-medium transition-all cursor-pointer shadow-2xs"
+                  title="A imagem mnemônica está oculta. Clique aqui para revelá-la como dica!"
+                >
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Imagem mnemônica oculta • Ver como dica</span>
+                </button>
+              )}
 
               {/* Pinyin e tradução revelados (apenas se acertou ou desistiu) */}
               {(isCorrect || isRevealed) && (
@@ -827,7 +911,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
             </button>
 
             <span className="text-xs font-semibold text-slate-500">
-              Ideograma {currentIndex + 1} de {HANZI_VISUAL_FLASHCARDS.length}
+              Ideograma {currentIndex + 1} de {deck.length}
             </span>
 
             <button
@@ -842,7 +926,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
         </div>
       ) : (
         /* ============================================================ */
-        /* MODO BIBLIOTECA 3D (Exploração livre de todos os 12 cards) */
+        /* MODO BIBLIOTECA 3D (Exploração livre dos cards) */
         /* ============================================================ */
         <div className="flex flex-col items-center gap-4 w-full">
           <div 
@@ -854,7 +938,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               animate={{ rotateY: flipState ? 180 : 0 }}
               transition={{ duration: 0.55, ease: 'easeInOut' }}
             >
-              {/* FRONT */}
+              {/* FRONT: Primeiro somente o caractere (Hanzi) */}
               <div className="absolute inset-0 backface-hidden w-full h-full rounded-3xl p-6 sm:p-8 flex flex-col justify-between border-2 border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-rose-50/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -875,22 +959,18 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                   </button>
                 </div>
 
-                <div className="flex flex-col items-center justify-center my-4 text-center">
-                  <span className="text-4xl mb-2">{activeCard.emoji}</span>
-                  <h1 className="text-7xl sm:text-8xl font-black text-slate-900 font-serif drop-shadow-xs">
+                <div className="flex flex-col items-center justify-center my-6 text-center">
+                  {/* Primeiro somente o caractere (Hanzi) */}
+                  <h1 className="text-8xl sm:text-9xl font-black text-slate-900 font-serif drop-shadow-sm select-none">
                     {activeCard.hanzi}
                   </h1>
-                  <div className="mt-3 flex items-center gap-2 bg-amber-100 px-4 py-1.5 rounded-2xl border border-amber-200">
-                    <span className="font-mono text-xl font-black text-amber-950">
-                      {activeCard.pinyin}
+
+                  <div className="mt-4 flex items-center gap-2 bg-amber-100/80 hover:bg-amber-100 text-amber-900 px-4 py-2 rounded-2xl border border-amber-300 transition-colors shadow-2xs">
+                    <Lightbulb className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs font-bold">
+                      Clique para virar e ver a imagem mnemônica como dica, pinyin e história
                     </span>
                   </div>
-                  <p className="mt-2 text-base font-bold text-slate-700">
-                    {activeCard.translation}
-                  </p>
-                  <p className="mt-1 text-xs text-amber-800 italic max-w-md">
-                    "{activeCard.hintPhrase}"
-                  </p>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-amber-100 pt-3 text-xs text-slate-500">
@@ -899,15 +979,18 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
                     Clique para virar o cartão e ver a história dos traços
                   </span>
                   <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded-md">
-                    {currentIndex + 1} / {HANZI_VISUAL_FLASHCARDS.length}
+                    {currentIndex + 1} / {deck.length}
                   </span>
                 </div>
               </div>
 
-              {/* BACK */}
+              {/* BACK: Imagem Mnemônica (Dica), Pinyin, Tradução e Radicais */}
               <div className="absolute inset-0 backface-hidden rotate-y-180 w-full h-full rounded-3xl p-6 sm:p-7 flex flex-col justify-between border-2 border-amber-400 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl drop-shadow-sm select-none" role="img" aria-label="Visual mnemonic">
+                      {activeCard.emoji}
+                    </span>
                     <span className="text-2xl font-bold font-serif text-amber-300">
                       {activeCard.hanzi}
                     </span>
