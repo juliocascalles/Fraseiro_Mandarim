@@ -84,12 +84,16 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
     setFlipState(false);
   }, []);
 
-  // Shuffle deck handler (sem botão Restaurar Ordem - Req 1.1)
+  // Shuffle deck handler: ao embaralhar, os cards ficam limpos sem marcas de concluído ou imagens
   const handleShuffleDeck = useCallback(() => {
     const shuffled = [...HANZI_VISUAL_FLASHCARDS].sort(() => Math.random() - 0.5);
     setDeck(shuffled);
     setCurrentIndex(0);
     resetCardInteractiveState();
+    setProgress({});
+    try {
+      localStorage.removeItem('hanzi_flashcards_progress_v2');
+    } catch {}
   }, [resetCardInteractiveState]);
 
   // Req 2: Com a "Biblioteca 3D", virar um flashcard é o mesmo que clicar em "Mostrar Dica do Desenho"
@@ -357,7 +361,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
             type="button"
             onClick={handleShuffleDeck}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs border bg-purple-600 hover:bg-purple-700 text-white border-purple-500 active:scale-95"
-            title="Embaralhar todos os flashcards aleatoriamente"
+            title="Embaralhar todos os flashcards e reiniciar sem marcas de concluído ou imagens"
           >
             <Shuffle className="w-3.5 h-3.5" />
             <span>Embaralhar Cards</span>
@@ -406,7 +410,7 @@ export const HanziFlashcardsMode: React.FC<HanziFlashcardsModeProps> = ({
               type="button"
               onClick={handleShuffleDeck}
               className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 underline cursor-pointer flex items-center gap-0.5"
-              title="Embaralhar novamente a sequência"
+              title="Embaralhar novamente a sequência e reiniciar sem marcas"
             >
               <Shuffle className="w-3 h-3" />
               re-embaralhar
