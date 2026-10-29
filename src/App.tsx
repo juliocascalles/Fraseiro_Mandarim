@@ -14,7 +14,7 @@ import {
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
-  Hash, LogOut, Flame, AlertTriangle, Calendar
+  Hash, LogOut, Flame, AlertTriangle, Calendar, ShoppingBag, Shirt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -27,6 +27,7 @@ import { GoogleLoginGate } from './components/GoogleLoginGate';
 import { ChineseNumbersModal } from './components/ChineseNumbersModal';
 import { FalseFriendsModal } from './components/FalseFriendsModal';
 import { HanziFlashcardsMode } from './components/HanziFlashcardsMode';
+import { ShopMode } from './components/ShopMode';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
@@ -133,6 +134,8 @@ const WORDS: Word[] = [
   { id: 'zhang', label: 'zhāng', hanzi: '张', translation: 'folha / mapa / superfície plana (classif.)', category: 'classifier', icon: FileText, hskLevel: 'HSK 1' },
   { id: 'bei', label: 'bēi', hanzi: '杯', translation: 'copo / xícara (classif.)', category: 'classifier', icon: Coffee, hskLevel: 'HSK 1' },
   { id: 'sui', label: 'suì', hanzi: '岁', translation: 'anos de idade', category: 'classifier', icon: Tag, hskLevel: 'HSK 1' },
+  { id: 'kuai_money', label: 'kuài', hanzi: '块', translation: 'iuanes / dinheiro (unidade)', category: 'classifier', icon: Coins, hskLevel: 'HSK 1' },
+  { id: 'jian_cloth', label: 'jiàn', hanzi: '件', translation: 'peça de roupa (classif.)', category: 'classifier', icon: Shirt, hskLevel: 'HSK 2' },
 
   // Questions
   { id: 'ma', label: 'ma', hanzi: '吗', translation: '?', category: 'question', icon: HelpCircle, hskLevel: 'HSK 1' },
@@ -235,6 +238,16 @@ const WORDS: Word[] = [
   { id: 'jiaozi', label: 'jiǎozi', hanzi: '饺子', translation: 'bolinhos chineses / guiozas', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'kele', label: 'kělè', hanzi: '可乐', translation: 'Coca-Cola / refrigerante', category: 'thing', icon: CupSoda, hskLevel: 'HSK 2' },
   { id: 'qiu', label: 'qiú', hanzi: '球', translation: 'bola / esportes com bola', category: 'thing', icon: Target, hskLevel: 'HSK 1' },
+  
+  // Clothing & Store Items (Roupas da Loja)
+  { id: 'waitao', label: 'wàitào', hanzi: '外套', translation: 'casaco', category: 'thing', icon: Shirt, hskLevel: 'HSK 2' },
+  { id: 'duanxiu', label: 'duǎnxiù', hanzi: '短袖', translation: 'camiseta', category: 'thing', icon: Shirt, hskLevel: 'HSK 2' },
+  { id: 'beixin', label: 'bèixīn', hanzi: '背心', translation: 'colete', category: 'thing', icon: Shirt, hskLevel: 'HSK 2' },
+  { id: 'qunzi', label: 'qúnzi', hanzi: '裙子', translation: 'saia', category: 'thing', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'duanku', label: 'duǎnkù', hanzi: '短裤', translation: 'shorts', category: 'thing', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'lianyiqun', label: 'liányīqún', hanzi: '连衣裙', translation: 'vestido', category: 'thing', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'chenshan', label: 'chènshān', hanzi: '衬衫', translation: 'camisa', category: 'thing', icon: Shirt, hskLevel: 'HSK 2' },
+  { id: 'kuzi', label: 'chángkù', hanzi: '长裤', translation: 'calça', category: 'thing', icon: Tag, hskLevel: 'HSK 2' },
 
   // Adjectives
   { id: 'hao', label: 'hǎo', hanzi: '好', translation: 'bom / bem (olá)', category: 'adjective', icon: Smile, hskLevel: 'HSK 1' },
@@ -250,6 +263,13 @@ const WORDS: Word[] = [
   { id: 'piaoliang', label: 'piaoliang', hanzi: '漂亮', translation: 'bonito(a)', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
   { id: 'shuai', label: 'shuai', hanzi: '帅', translation: 'bonito (homem)', category: 'adjective', icon: User, hskLevel: 'HSK 2' },
   { id: 'heise', label: 'hēisè', hanzi: '黑色', translation: 'cor preta / preto', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'lanse', label: 'lánsè', hanzi: '蓝色', translation: 'azul', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'luse', label: 'lǜsè', hanzi: '绿色', translation: 'verde', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'huangse', label: 'huángsè', hanzi: '黄色', translation: 'amarelo(a)', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'chengse', label: 'chéngsè', hanzi: '橙色', translation: 'laranja', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'hongse', label: 'hóngsè', hanzi: '红色', translation: 'vermelho(a)', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'fense', label: 'fěnsè', hanzi: '粉色', translation: 'rosa', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
+  { id: 'zise', label: 'zǐsè', hanzi: '紫色', translation: 'roxo(a)', category: 'adjective', icon: Tag, hskLevel: 'HSK 2' },
   { id: 'gao', label: 'gāo', hanzi: '高', translation: 'alto', category: 'adjective', icon: Tag, hskLevel: 'HSK 1' },
   { id: 're', label: 'rè', hanzi: '热', translation: 'quente', category: 'adjective', icon: Sun, hskLevel: 'HSK 1' },
   { id: 'leng', label: 'lěng', hanzi: '冷', translation: 'frio', category: 'adjective', icon: Droplets, hskLevel: 'HSK 1' },
@@ -512,6 +532,42 @@ const COMPOUND_PINYIN_MAP: Record<string, string> = {
   'haizimen': 'haizimen',
   'pai qiu': 'paiqiu',
   'paiqiu': 'paiqiu',
+
+  // Colors (Cores da Loja)
+  'lan se': 'lanse',
+  'lanse': 'lanse',
+  'lu se': 'luse',
+  'luse': 'luse',
+  'huang se': 'huangse',
+  'huangse': 'huangse',
+  'cheng se': 'chengse',
+  'chengse': 'chengse',
+  'hong se': 'hongse',
+  'hongse': 'hongse',
+  'fen se': 'fense',
+  'fense': 'fense',
+  'zi se': 'zise',
+  'zise': 'zise',
+
+  // Clothing (Roupas da Loja)
+  'wai tao': 'waitao',
+  'waitao': 'waitao',
+  'duan xiu': 'duanxiu',
+  'duanxiu': 'duanxiu',
+  'bei xin': 'beixin',
+  'beixin': 'beixin',
+  'qun zi': 'qunzi',
+  'qunzi': 'qunzi',
+  'duan ku': 'duanku',
+  'duanku': 'duanku',
+  'lian yi qun': 'lianyiqun',
+  'lianyiqun': 'lianyiqun',
+  'chen shan': 'chenshan',
+  'chenshan': 'chenshan',
+  'ku zi': 'kuzi',
+  'kuzi': 'kuzi',
+  'chang ku': 'kuzi',
+  'changku': 'kuzi',
 };
 
 // Helper for natural/fluent idiomatic translation of Mandarin phrases to Portuguese
@@ -2632,7 +2688,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz' | 'flashcards'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop'>('chat');
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [sequence, setSequence] = useState<Word[]>([]);
   const [insertIndex, setInsertIndex] = useState<number>(0);
@@ -2857,7 +2913,7 @@ export default function App() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.23
+                  v1.2026.10.29
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-semibold tracking-wide">
@@ -2950,6 +3006,25 @@ export default function App() {
               >
                 <Shuffle className="w-3.5 h-3.5" />
                 <span>Quiz</span>
+              </button>
+
+              <button
+                id="tab-shop-btn"
+                onClick={() => setActiveTab('shop')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'shop'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Loja de Roupas: simule compras em mandarim, pergunte e responda preços por extenso"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Loja</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'shop' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  Roupas
+                </span>
               </button>
             </div>
 
@@ -3078,6 +3153,8 @@ export default function App() {
             allWords={WORDS}
             validateAndBuildPhrase={validateAndBuildPhrase}
           />
+        ) : activeTab === "shop" ? (
+          <ShopMode onOpenNumbersModal={() => setIsNumbersModalOpen(true)} />
         ) : (
           <PracticeMode
             allWords={WORDS}
