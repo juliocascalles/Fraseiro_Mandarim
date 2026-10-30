@@ -41,7 +41,7 @@ export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess }) =
 
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold mb-3">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Mandarim Fácil • v1.2026.10.29</span>
+          <span>Mandarim Fácil • v1.2026.10.30</span>
         </div>
 
         <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">

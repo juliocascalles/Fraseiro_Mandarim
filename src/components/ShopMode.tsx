@@ -16,7 +16,8 @@ import {
   Hash, 
   Lightbulb,
   Shuffle,
-  Sparkles
+  Sparkles,
+  Flame
 } from 'lucide-react';
 import gridRoupasImg from '../assets/grid_roupas.png';
 import { 
@@ -25,6 +26,7 @@ import {
   nomeRoupaTraduzida, 
   nomeRoupaEmChines,
   precoFinal,
+  precoComDesconto,
   ColorItem, 
   ClothItem 
 } from '../utils/colorfulClothes';
@@ -103,6 +105,7 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
   const [askCloth, setAskCloth] = useState<ClothItem>(clothes[1]); // camiseta (33)
   const [askColor, setAskColor] = useState<ColorItem>(colors[2]); // amarelo
   const [askInput, setAskInput] = useState<string>('');
+  const [isBargained, setIsBargained] = useState<boolean>(false);
   const [askFeedback, setAskFeedback] = useState<{
     status: 'idle' | 'success' | 'error';
     message: string;
@@ -114,6 +117,8 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
       priceChinese: string;
       pricePinyin: string;
       breakdown: string;
+      isDiscounted?: boolean;
+      discountAmount?: number;
     };
   }>({ status: 'idle', message: '' });
 
@@ -143,6 +148,7 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
     setAskColor(randomColor);
     setAskInput('');
     setAskFeedback({ status: 'idle', message: '' });
+    setIsBargained(false);
   };
 
   // Sorteia uma nova peça para o Modo Vendedor
@@ -222,8 +228,105 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
       return;
     }
 
+    // 3. Regra 1.1: Se entre o nome da cor e "duo shao qian" tiver alguma coisa, deve ser o nome correto da peça, precedido ou não de "de" (的)
+    const lowerInput = askInput.toLowerCase();
+    let colorEndPos = -1;
+
+    // Localiza o término da menção à cor na string original
+    if (askInput.includes(askColor.hanzi)) {
+      colorEndPos = askInput.indexOf(askColor.hanzi) + askColor.hanzi.length;
+    } else if (lowerInput.includes(askColor.pinyin.toLowerCase())) {
+      colorEndPos = lowerInput.indexOf(askColor.pinyin.toLowerCase()) + askColor.pinyin.length;
+    } else if (lowerInput.includes(expectedColorNorm)) {
+      colorEndPos = lowerInput.indexOf(expectedColorNorm) + expectedColorNorm.length;
+    } else if (lowerInput.includes(expectedColorBase)) {
+      colorEndPos = lowerInput.indexOf(expectedColorBase) + expectedColorBase.length;
+    } else if (askInput.includes(askColor.hanzi[0])) {
+      colorEndPos = askInput.indexOf(askColor.hanzi[0]) + 1;
+    }
+
+    // Localiza o início da pergunta de preço "duo shao qian"
+    let duoStartPos = -1;
+    const duoTokens = ['多少钱', '多少', 'duo shao qian', 'duoshao qian', 'duoshaoqian', 'duo shao', 'duoshao'];
+    for (const token of duoTokens) {
+      const isHanziToken = token === '多少钱' || token === '多少';
+      const pos = isHanziToken ? askInput.indexOf(token) : lowerInput.indexOf(token);
+      if (pos !== -1) {
+        if (duoStartPos === -1 || pos < duoStartPos) {
+          duoStartPos = pos;
+        }
+      }
+    }
+
+    if (colorEndPos !== -1 && duoStartPos !== -1 && colorEndPos <= duoStartPos) {
+      const betweenRaw = askInput.slice(colorEndPos, duoStartPos).trim();
+      let cleaned = betweenRaw.replace(/^[,\s\-._?？!！]+|[,\s\-._?？!！]+$/g, '').trim();
+
+      // Remove o conectivo "de" ou "的" se presente (precedido ou não de "de")
+      if (cleaned.startsWith('的')) {
+        cleaned = cleaned.slice(1).trim();
+      } else if (cleaned.toLowerCase().startsWith('de ') || cleaned.toLowerCase() === 'de') {
+        cleaned = cleaned.slice(2).trim();
+      }
+      if (cleaned.startsWith('的')) {
+        cleaned = cleaned.slice(1).trim();
+      }
+
+      // Se após remover "de" / "的" sobrou algo, DEVE ser o nome correto da peça!
+      if (cleaned !== '') {
+        const cleanedNorm = normalizePinyin(cleaned);
+        const expectedClothNorm = normalizePinyin(askCloth.pinyin);
+        const cleanedNoSpaces = cleanedNorm.replace(/\s+/g, '');
+        const expectedNoSpaces = expectedClothNorm.replace(/\s+/g, '');
+
+        const isCorrectCloth = 
+          cleaned === askCloth.hanzi ||
+          cleaned.replace(/\s+/g, '') === askCloth.hanzi ||
+          cleanedNorm === expectedClothNorm ||
+          cleanedNoSpaces === expectedNoSpaces;
+
+        if (!isCorrectCloth) {
+          // Verifica se mencionou outra peça da lista
+          const mentionedOtherCloth = clothes.find(c => {
+            const otherNorm = normalizePinyin(c.pinyin);
+            return (
+              cleanedNorm === otherNorm ||
+              cleanedNoSpaces === otherNorm.replace(/\s+/g, '') ||
+              cleaned.replace(/\s+/g, '') === c.hanzi ||
+              cleaned.includes(c.hanzi)
+            );
+          });
+
+          if (mentionedOtherCloth) {
+            setAskFeedback({
+              status: 'error',
+              message: `Atenção à peça: a peça exibida é ${askCloth.traducao} (${askCloth.pinyin} / ${askCloth.hanzi}), mas você escreveu "${mentionedOtherCloth.traducao}" (${mentionedOtherCloth.pinyin} / ${mentionedOtherCloth.hanzi}). Se incluir o nome da peça entre a cor e "duo shao qian", use o nome correto da peça exibida!`,
+            });
+            return;
+          }
+
+          // Verifica se digitou a tradução em português da peça
+          if (cleanedNorm === normalizePinyin(askCloth.traducao)) {
+            setAskFeedback({
+              status: 'error',
+              message: `Quase lá! Em mandarim, use o nome da peça em chinês ("${askCloth.pinyin}" ou "${askCloth.hanzi}") em vez do português "${askCloth.traducao}". Lembrando que o nome da roupa é opcional: você pode dizer apenas "${askColor.pinyin} duo shao qian"!`,
+            });
+            return;
+          }
+
+          // Texto não reconhecido
+          setAskFeedback({
+            status: 'error',
+            message: `Texto não reconhecido entre a cor e "duo shao qian": "${cleaned}". Se você incluir algo entre a cor e a pergunta de preço, deve ser o nome correto da peça exibida ("${askCloth.pinyin}" ou "${askCloth.hanzi}"), opcionalmente precedido de "de" (的), ou deixar vazio!`,
+          });
+          return;
+        }
+      }
+    }
+
     // Sucesso! O vendedor responde com o preço por extenso calculado
     // O preço final soma o preço base da roupa com a demanda da cor
+    setIsBargained(false);
     const priceNum = precoFinal(askCloth, askColor);
     const chineseNum = convertNumberToChinese(priceNum);
     const pieceNameHanzi = `${askColor.hanzi}的${askCloth.hanzi}`;
@@ -244,8 +347,43 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
         priceChinese: `${chineseNum.hanzi} 块`,
         pricePinyin: `${chineseNum.pinyin} kuài`,
         breakdown: chineseNum.breakdown,
+        isDiscounted: false,
       },
     });
+  };
+
+  // Pechinchar desconto da peça dizendo "Tài guì le!" (太贵了) - Regra 1.2
+  const handleBargainDiscount = () => {
+    if (isBargained || !askFeedback.sellerReply) return;
+
+    const discount = askCloth.desconto || 5;
+    const initialPrice = precoFinal(askCloth, askColor);
+    const discountedPrice = Math.max(1, initialPrice - discount);
+    const newChineseNum = convertNumberToChinese(discountedPrice);
+
+    const sellerSpeechHanzi = `好吧，给你便宜一点儿！${newChineseNum.hanzi}块钱，怎么样？`;
+    const sellerSpeechPinyin = `Hǎo ba, gěi nǐ piányi yīdiǎnr! ${newChineseNum.pinyin} kuài qián, zěnmeyàng?`;
+    const sellerSpeechPt = `Está bem, faço um desconto de ¥${discount}! Fica por ${newChineseNum.portuguese} iuanes (¥${discountedPrice}), o que acha?`;
+
+    speakMandarin(sellerSpeechHanzi);
+
+    setAskFeedback({
+      status: 'success',
+      message: `Você pechinchou dizendo "Tài guì le!" (太贵了 - Está muito caro!) e o vendedor concedeu um desconto de ¥${discount}!`,
+      sellerReply: {
+        hanzi: sellerSpeechHanzi,
+        pinyin: sellerSpeechPinyin,
+        portuguese: sellerSpeechPt,
+        price: discountedPrice,
+        priceChinese: `${newChineseNum.hanzi} 块`,
+        pricePinyin: `${newChineseNum.pinyin} kuài`,
+        breakdown: `${newChineseNum.breakdown} (Desconto de pechincha: -¥${discount})`,
+        isDiscounted: true,
+        discountAmount: discount,
+      },
+    });
+
+    setIsBargained(true);
   };
 
   // Validar a resposta de preço (Modo Vendedor)
@@ -334,7 +472,7 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
                   <span className="text-amber-200 font-serif text-lg">服装店 (Fúzhuāngdiàn)</span>
                 </h2>
                 <span className="bg-amber-400/20 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300/40 uppercase">
-                  Módulo 1.2026.10.29
+                  Módulo 1.2026.10.30
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-rose-100 font-medium mt-0.5">
@@ -664,7 +802,37 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
+                {/* Indicador de Desconto Aplicado */}
+                {askFeedback.sellerReply.isDiscounted && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-950 text-xs font-semibold animate-fadeIn">
+                    <Flame className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div>
+                      <span>Pechincha aceita! Desconto de <strong>¥{askFeedback.sellerReply.discountAmount}</strong> concedido na peça {nomeRoupaTraduzida(askCloth, askColor)}.</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                  {/* Botão de Pechincha: Tài guì le! (Regra 1.2) */}
+                  <button
+                    type="button"
+                    onClick={handleBargainDiscount}
+                    disabled={isBargained}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                      isBargained
+                        ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-80'
+                        : 'bg-amber-500 hover:bg-amber-400 text-amber-950 hover:shadow-lg active:scale-95 border border-amber-400 shadow-md cursor-pointer'
+                    }`}
+                    title={
+                      isBargained
+                        ? `Desconto de ¥${askCloth.desconto} já concedido para esta peça`
+                        : `Dizer "太贵了" (Está muito caro!) para pedir um desconto de ¥${askCloth.desconto}!`
+                    }
+                  >
+                    <Flame className={`w-3.5 h-3.5 ${isBargained ? 'text-slate-400' : 'text-amber-900 animate-pulse'}`} />
+                    <span>{isBargained ? `Desconto Concedido (-¥${askCloth.desconto})` : 'tai gui le! (太贵了)'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={randomizeAskPiece}
@@ -1290,6 +1458,7 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
                   setAskColor(inspectModalPiece.cor);
                   setAskInput(`${inspectModalPiece.cor.pinyin} duo shao qian`);
                   setAskFeedback({ status: 'idle', message: '' });
+                  setIsBargained(false);
                   setSubTab('ask_price');
                   setInspectModalPiece(null);
                 }}

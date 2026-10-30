@@ -2913,7 +2913,7 @@ export default function App() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.10.29
+                  v1.2026.10.30
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-semibold tracking-wide">

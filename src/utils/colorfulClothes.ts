@@ -4,7 +4,7 @@ export interface ColorItem {
   backgroundPosX: number;
   traducao: string;
   traducaoFeminina?: string;
-  demanda: number
+  demanda: number;
 }
 
 export interface ClothItem {
@@ -14,6 +14,7 @@ export interface ClothItem {
   price: number;
   traducao: string;
   palavraFeminina: boolean;
+  desconto: number;
 }
 
 export const colors: ColorItem[] = [
@@ -78,7 +79,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 0,
     price: 175,
     traducao: "casaco",
-    palavraFeminina: false
+    palavraFeminina: false,
+    desconto: 25
   },
   {
     pinyin: "duan xiu",
@@ -86,7 +88,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 15,
     price: 33,
     traducao: "camiseta",
-    palavraFeminina: true
+    palavraFeminina: true,
+    desconto: 5
   },
   {
     pinyin: "bei xin",
@@ -94,7 +97,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 30,
     price: 49,
     traducao: "colete",
-    palavraFeminina: false
+    palavraFeminina: false,
+    desconto: 7
   },
   {
     pinyin: "qun zi",
@@ -102,7 +106,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 44,
     price: 38,
     traducao: "saia",
-    palavraFeminina: true
+    palavraFeminina: true,
+    desconto: 6
   },
   {
     pinyin: "duan ku",
@@ -110,7 +115,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 59,
     price: 45,
     traducao: "shorts",
-    palavraFeminina: false
+    palavraFeminina: false,
+    desconto: 7
   },
   {
     pinyin: "lian yi qun",
@@ -118,7 +124,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 73,
     price: 120,
     traducao: "vestido",
-    palavraFeminina: false
+    palavraFeminina: false,
+    desconto: 20
   },
   {
     pinyin: "chenshan",
@@ -126,7 +133,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 87,
     price: 66,
     traducao: "camisa",
-    palavraFeminina: true
+    palavraFeminina: true,
+    desconto: 10
   },
   {
     pinyin: "ku zi",
@@ -134,7 +142,8 @@ export const clothes: ClothItem[] = [
     backgroundPosY: 100,
     price: 74,
     traducao: "calça",
-    palavraFeminina: true
+    palavraFeminina: true,
+    desconto: 12
   }
 ];
 
@@ -172,4 +181,16 @@ export function precoFinal(
   cor: ColorItem
 ): number {
   return roupa.price + (cor.demanda || 0);
+}
+
+/**
+ * Calcula o preço com o desconto da peça subtraído após o cliente pechinchar ("tai gui le").
+ */
+export function precoComDesconto(
+  roupa: ClothItem,
+  cor: ColorItem
+): number {
+  const final = precoFinal(roupa, cor);
+  const desc = roupa.desconto || 5;
+  return Math.max(1, final - desc);
 }
