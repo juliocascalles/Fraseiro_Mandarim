@@ -4,9 +4,11 @@ import { signInWithGoogle } from '../lib/firebase';
 
 interface GoogleLoginGateProps {
   onSuccess?: () => void;
+  isInline?: boolean;
+  onCancel?: () => void;
 }
 
-export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess }) => {
+export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess, isInline = false, onCancel }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -31,28 +33,29 @@ export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess }) =
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-slate-100 flex flex-col items-center text-center">
-        {/* Chinese Flag / Dragon theme icon */}
-        <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-5 shadow-inner">
-          <span className="text-3xl font-serif font-black text-indigo-700">汉</span>
-        </div>
+  const content = (
+    <div className={`max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 flex flex-col items-center text-center ${
+      isInline ? 'shadow-md mx-auto my-4' : 'shadow-2xl'
+    }`}>
+      {/* Chinese Flag / Dragon theme icon */}
+      <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 shadow-inner">
+        <span className="text-3xl font-serif font-black text-indigo-700">汉</span>
+      </div>
 
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold mb-3">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Mandarim Fácil • v1.2026.10.30</span>
-        </div>
+      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold mb-3">
+        <Sparkles className="w-3.5 h-3.5" />
+        <span>Bate-Papo Comunitário • v1.2026.11.04</span>
+      </div>
 
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">
-          Fraseiro de Mandarim
-        </h1>
-        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-          Para acessar o aplicativo, praticar a construção de frases e participar do bate-papo comunitário, entre com sua conta Google.
-        </p>
+      <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
+        Acesso ao Bate-Papo
+      </h1>
+      <p className="text-xs sm:text-sm text-slate-500 mb-6 leading-relaxed">
+        O login com a conta Google é necessário <strong>exclusivamente para o bate-papo em tempo real</strong>, garantindo identificação das mensagens e moderação de salas. Todos os outros módulos do app são de acesso livre!
+      </p>
 
-        {/* Benefits list */}
-        <div className="w-full bg-slate-50 rounded-2xl p-4 mb-6 text-left border border-slate-100 flex flex-col gap-2.5">
+      {/* Benefits list */}
+      <div className="w-full bg-slate-50 rounded-2xl p-4 mb-6 text-left border border-slate-100 flex flex-col gap-2.5">
           <div className="flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <span className="text-xs text-slate-600 leading-snug">
@@ -123,6 +126,19 @@ export const GoogleLoginGate: React.FC<GoogleLoginGateProps> = ({ onSuccess }) =
           Conexão segura via Firebase Authentication.
         </p>
       </div>
+  );
+
+  if (isInline) {
+    return (
+      <div className="w-full flex justify-center py-6 px-4">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
+      {content}
     </div>
   );
 };

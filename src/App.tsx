@@ -14,7 +14,8 @@ import {
   Home, Heart, Smile, AlertCircle, Play, CornerDownLeft,
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
-  Hash, LogOut, Flame, AlertTriangle, Calendar, ShoppingBag, Shirt
+  Hash, LogOut, Flame, AlertTriangle, Calendar, ShoppingBag, Shirt, LogIn,
+  Menu, LayoutGrid, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -28,10 +29,12 @@ import { ChineseNumbersModal } from './components/ChineseNumbersModal';
 import { FalseFriendsModal } from './components/FalseFriendsModal';
 import { HanziFlashcardsMode } from './components/HanziFlashcardsMode';
 import { ShopMode } from './components/ShopMode';
+import { SlotMachineMode } from './components/SlotMachineMode';
+import { ModesMenuModal, AppModeTab } from './components/ModesMenuModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
 import { speakMandarin } from './utils/speech';
-import { auth, isSuperUser, signOutUser } from './lib/firebase';
+import { auth, isSuperUser, signOutUser, signInWithGoogle } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // --- Data ---
@@ -104,6 +107,8 @@ const WORDS: Word[] = [
   { id: 'gan', label: 'gàn', hanzi: '干', translation: 'fazer / realizar (ação direta)', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'gan_dare', label: 'gǎn', hanzi: '敢', translation: 'ousar / atrever-se / fazer', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'mai', label: 'mǎi', hanzi: '买', translation: 'comprar', category: 'verb', icon: Coins, hskLevel: 'HSK 1' },
+  { id: 'mai_sell', label: 'mài', hanzi: '卖', translation: 'vender', category: 'verb', icon: Coins, hskLevel: 'HSK 2' },
+  { id: 'zhao_verb', label: 'zhǎo', hanzi: '找', translation: 'procurar / buscar', category: 'verb', icon: Search, hskLevel: 'HSK 2' },
   { id: 'yong_verb', label: 'yòng', hanzi: '用', translation: 'usar / utilizar / por meio de', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
   { id: 'xie', label: 'xiě', hanzi: '写', translation: 'escrever', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
   { id: 'xiezi', label: 'xiězì', hanzi: '写字', translation: 'escrever ideogramas', category: 'verb', icon: PenTool, hskLevel: 'HSK 1' },
@@ -184,8 +189,15 @@ const WORDS: Word[] = [
   { id: 'yingwen', label: 'Yīngwén', hanzi: '英文', translation: 'inglês (língua)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 1' },
   { id: 'puwen', label: 'Púwén', hanzi: '葡文', translation: 'português (língua portuguesa)', category: 'noun', icon: BookOpen, hskLevel: 'HSK 2' },
   { id: 'zaoshang', label: 'zǎoshang', hanzi: '早上', translation: 'manhã (cedo / bom dia)', category: 'noun', icon: Sun, hskLevel: 'HSK 2' },
+  { id: 'wanshang', label: 'wǎnshang', hanzi: '晚上', translation: 'à noite / de noite', category: 'noun', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'xiawu', label: 'xiàwǔ', hanzi: '下午', translation: 'à tarde / de tarde', category: 'noun', icon: Sun, hskLevel: 'HSK 1' },
+  { id: 'zhongwu', label: 'zhōngwǔ', hanzi: '中午', translation: 'ao meio-dia', category: 'noun', icon: Sun, hskLevel: 'HSK 2' },
   { id: 'difang', label: 'dìfang', hanzi: '地方', translation: 'lugar / localidade', category: 'noun', icon: Globe, hskLevel: 'HSK 2' },
   { id: 'chaoshi', label: 'chāoshì', hanzi: '超市', translation: 'supermercado', category: 'noun', icon: Briefcase, hskLevel: 'HSK 2' },
+  { id: 'shangdian', label: 'shāngdiàn', hanzi: '商店', translation: 'loja / comércio', category: 'noun', icon: Briefcase, hskLevel: 'HSK 1' },
+  { id: 'shudian', label: 'shūdiàn', hanzi: '书店', translation: 'livraria', category: 'noun', icon: Book, hskLevel: 'HSK 2' },
+  { id: 'fanguan', label: 'fànguǎn', hanzi: '饭馆', translation: 'restaurante', category: 'noun', icon: Utensils, hskLevel: 'HSK 1' },
+  { id: 'fuzhuangdian', label: 'fúzhuāngdiàn', hanzi: '服装店', translation: 'loja de roupas', category: 'noun', icon: Shirt, hskLevel: 'HSK 2' },
   { id: 'mingzi', label: 'ming zi', hanzi: '名字', translation: 'nome', category: 'noun', icon: FileText, hskLevel: 'HSK 1' },
   { id: 'tongxue', label: 'tongxue', hanzi: '同学', translation: 'colega', category: 'noun', icon: GraduationCap, hskLevel: 'HSK 1' },
   { id: 'laoshi', label: 'laoshi', hanzi: '老师', translation: 'professor', category: 'noun', icon: Briefcase, hskLevel: 'HSK 1' },
@@ -235,6 +247,9 @@ const WORDS: Word[] = [
   { id: 'shouji', label: 'shǒujī', hanzi: '手机', translation: 'celular', category: 'thing', icon: MessageSquare, hskLevel: 'HSK 2' },
   { id: 'kuaizi', label: 'kuàizi', hanzi: '筷子', translation: 'pauzinhos / hashis', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'dangao', label: 'dàngāo', hanzi: '蛋糕', translation: 'bolo', category: 'thing', icon: Heart, hskLevel: 'HSK 2' },
+  { id: 'pingguo', label: 'píngguǒ', hanzi: '苹果', translation: 'maçã(s)', category: 'thing', icon: Heart, hskLevel: 'HSK 1' },
+  { id: 'shuiguo', label: 'shuǐguǒ', hanzi: '水果', translation: 'fruta(s)', category: 'thing', icon: Heart, hskLevel: 'HSK 1' },
+  { id: 'miantiao', label: 'miàntiáo', hanzi: '面条', translation: 'macarrão / talharim', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'jiaozi', label: 'jiǎozi', hanzi: '饺子', translation: 'bolinhos chineses / guiozas', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'kele', label: 'kělè', hanzi: '可乐', translation: 'Coca-Cola / refrigerante', category: 'thing', icon: CupSoda, hskLevel: 'HSK 2' },
   { id: 'qiu', label: 'qiú', hanzi: '球', translation: 'bola / esportes com bola', category: 'thing', icon: Target, hskLevel: 'HSK 1' },
@@ -2688,8 +2703,30 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop'>('chat');
+  const [activeTab, setActiveTab] = useState<AppModeTab>('chat');
+  const [isModesMenuOpen, setIsModesMenuOpen] = useState<boolean>(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
+
+  const currentModeInfo = useMemo(() => {
+    switch (activeTab) {
+      case 'slots':
+        return { title: 'Caça-níqueis', hanzi: '老虎机', icon: '🎰' };
+      case 'shop':
+        return { title: 'Loja de Roupas', hanzi: '服装店', icon: '🛍️' };
+      case 'chat':
+        return { title: 'Bate-papo', hanzi: '聊天室', icon: '💬' };
+      case 'practice':
+        return { title: 'Prática', hanzi: '练习', icon: '🎯' };
+      case 'flashcards':
+        return { title: 'Flashcards', hanzi: '字卡', icon: '✨' };
+      case 'hanzi':
+        return { title: 'Modo Hanzi', hanzi: '描红', icon: '🖌️' };
+      case 'quiz':
+        return { title: 'Quiz', hanzi: '测试', icon: '🔀' };
+      default:
+        return { title: 'Fraseiro', hanzi: '中文', icon: '🇨🇳' };
+    }
+  }, [activeTab]);
   const [sequence, setSequence] = useState<Word[]>([]);
   const [insertIndex, setInsertIndex] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -2894,46 +2931,211 @@ export default function App() {
     );
   }
 
-  // Se o usuário não estiver autenticado via Conta Google, exige o login Google (Req 2)
-  if (!currentUser) {
-    return <GoogleLoginGate onLoginSuccess={(user) => setCurrentUser(user)} />;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans p-2 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-start sm:justify-center">
+    <div className="min-h-screen bg-slate-950 text-white font-sans p-0 sm:p-3 md:p-6 flex flex-col items-center justify-start sm:justify-center">
       {/* Main App Container */}
-      <div className="w-full max-w-5xl xl:max-w-6xl bg-white text-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl p-3 sm:p-6 md:p-8 flex flex-col gap-5 sm:gap-6 border border-slate-100 my-auto">
-        {/* Header with Navigation & Action Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md shrink-0">
-              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-display uppercase tracking-tight">Fraseiro Mandarim</h1>
-                <span className="bg-indigo-50 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wider">
-                  v1.2026.10.30
-                </span>
+      <div className="w-full max-w-5xl xl:max-w-6xl bg-white text-slate-800 rounded-none sm:rounded-3xl shadow-2xl p-3 sm:p-5 md:p-8 flex flex-col gap-4 sm:gap-6 border-0 sm:border border-slate-100 min-h-screen sm:min-h-0 my-0 sm:my-auto pb-24 md:pb-8">
+        
+        {/* Responsive Header: App Brand, Quick Modes, Reference Tools & Profile */}
+        <header className="border-b border-slate-100 pb-3 sm:pb-4 flex flex-col gap-3">
+          {/* Top Row: Brand + Active Mode Tag + Main Menu Button + Quick Actions */}
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            
+            {/* Brand Logo & Title */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-indigo-700 text-white shadow-md flex items-center justify-center font-bold text-base sm:text-lg shrink-0 select-none">
+                汉
               </div>
-              <p className="text-[11px] text-slate-500 font-semibold tracking-wide">
-                Converse em mandarim enquanto aprende
-              </p>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight truncate">
+                    Fraseiro Mandarim
+                  </h1>
+                  <span className="text-[10px] text-slate-400 font-mono hidden min-[480px]:inline">
+                    v1.2026.11.04
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="font-semibold text-indigo-600 flex items-center gap-1 truncate">
+                    <span>{currentModeInfo.icon}</span>
+                    <span>{currentModeInfo.title}</span>
+                  </span>
+                  <span className="text-slate-300 hidden sm:inline">·</span>
+                  <span className="text-[11px] text-slate-400 hidden sm:inline truncate">
+                    Converse em mandarim enquanto aprende
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Controls: Menu de Modos Button + Reference Tools + Profile/Login */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              
+              {/* Botão Principal "Modos de Estudo" (Abre o menu organizado em qualquer tela) */}
+              <button
+                type="button"
+                id="btn-open-modes-menu"
+                onClick={() => setIsModesMenuOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95"
+                title="Abrir o menu com todos os modos de aprendizado e ferramentas"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Modos de Estudo</span>
+                <span className="sm:hidden">Modos</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-indigo-500 text-[10px] font-bold">
+                  7
+                </span>
+              </button>
+
+              {/* Botões Rápidos de Consulta (Visíveis em Telas Médias e Grandes) */}
+              <div className="hidden lg:flex items-center gap-1 pl-1 border-l border-slate-200">
+                <button
+                  type="button"
+                  id="open-dictionary-btn"
+                  onClick={() => setIsDictionaryOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Abrir dicionário visual completo"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Dicionário</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="open-numbers-btn"
+                  onClick={() => setIsNumbersModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Guia e Conversor de Números por Extenso em Mandarim"
+                >
+                  <Hash className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Números</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="open-false-friends-btn"
+                  onClick={() => setIsFalseFriendsOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100/80 transition-colors cursor-pointer border border-amber-200/60"
+                  title="Não Confundir! Falsos Cognatos e Homófonos no Mandarim"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Não Confundir</span>
+                </button>
+              </div>
+
+              {/* User Profile Pill & Sign Out OR Login Button */}
+              {currentUser ? (
+                <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-200">
+                  <div 
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                    title={`Conectado como: ${currentUser.displayName || currentUser.email || 'Usuário Google'}${isSuperUser(currentUser) ? ' (Superusuário)' : ''}`}
+                  >
+                    {currentUser.photoURL ? (
+                      <img 
+                        src={currentUser.photoURL} 
+                        alt="Avatar" 
+                        className="w-5 h-5 rounded-full object-cover shrink-0" 
+                        referrerPolicy="no-referrer" 
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-semibold text-slate-700 max-w-[100px] truncate hidden xl:inline">
+                      {currentUser.displayName || currentUser.email}
+                    </span>
+                    {isSuperUser(currentUser) && (
+                      <span className="px-1 py-0.2 rounded-md bg-amber-100 text-amber-900 font-bold text-[9px] hidden sm:inline">
+                        👑
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    id="btn-logout-google"
+                    type="button"
+                    onClick={() => signOutUser()}
+                    className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                    title="Sair da conta Google"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  id="header-google-login-btn"
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await signInWithGoogle();
+                    } catch (e) {
+                      console.error('Login error:', e);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-xs transition-all cursor-pointer"
+                  title="Conectar com a conta Google para usar o Bate-papo"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline">Entrar (Google)</span>
+                  <span className="sm:hidden">Entrar</span>
+                </button>
+              )}
+
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Mode Switcher Tabs */}
-            <div className="flex items-center overflow-x-auto max-w-full gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+          {/* Bottom Row on Tablet/Desktop: Horizontal Segmented Tabs for Direct Access */}
+          <div className="hidden md:flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+            <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 overflow-x-auto max-w-full">
+              
+              <button
+                id="tab-slots-btn"
+                onClick={() => setActiveTab('slots')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'slots'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Caça-níqueis de Frases: monte frases com 5 faixas e adivinhe a tradução"
+              >
+                <span>🎰</span>
+                <span>Caça-níqueis</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'slots' ? 'bg-amber-950 text-amber-300' : 'bg-amber-100 text-amber-900'
+                }`}>
+                  Novo
+                </span>
+              </button>
+
+              <button
+                id="tab-shop-btn"
+                onClick={() => setActiveTab('shop')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'shop'
+                    ? 'bg-rose-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Loja de Roupas: simule compras em mandarim e pratique preços por extenso"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Loja de Roupas</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'shop' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  Roupas
+                </span>
+              </button>
+
               <button
                 id="tab-chat-btn"
                 onClick={() => setActiveTab('chat')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'chat'
-                    ? 'bg-indigo-600 text-white shadow-xs'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Bate-papo em tempo real: envie e receba frases construídas"
+                title="Bate-papo em tempo real com construtor de frases"
               >
                 <Users className="w-3.5 h-3.5" />
                 <span>Bate-papo</span>
@@ -2945,49 +3147,11 @@ export default function App() {
               </button>
 
               <button
-                id="tab-flashcards-btn"
-                onClick={() => setActiveTab('flashcards')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'flashcards'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Flashcards Mnemônicos: o desenho dos hanzis para lembrar o significado"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Flashcards</span>
-                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
-                  activeTab === 'flashcards' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-900'
-                }`}>
-                  Mnemônicas
-                </span>
-              </button>
-
-              <button
-                id="tab-hanzi-btn"
-                onClick={() => setActiveTab('hanzi')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'hanzi'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Modo Hanzi: desenhe caracteres na grade e pratique a ordem dos traços"
-              >
-                <PenTool className="w-3.5 h-3.5" />
-                <span>Modo Hanzi</span>
-                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
-                  activeTab === 'hanzi' ? 'bg-rose-700 text-white' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  Desenho
-                </span>
-              </button>
-
-              <button
                 id="tab-practice-btn"
                 onClick={() => setActiveTab('practice')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'practice'
-                    ? 'bg-indigo-600 text-white shadow-xs'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -2996,11 +3160,37 @@ export default function App() {
               </button>
 
               <button
+                id="tab-flashcards-btn"
+                onClick={() => setActiveTab('flashcards')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'flashcards'
+                    ? 'bg-amber-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Flashcards</span>
+              </button>
+
+              <button
+                id="tab-hanzi-btn"
+                onClick={() => setActiveTab('hanzi')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'hanzi'
+                    ? 'bg-rose-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <PenTool className="w-3.5 h-3.5" />
+                <span>Modo Hanzi</span>
+              </button>
+
+              <button
                 id="tab-quiz-btn"
                 onClick={() => setActiveTab('quiz')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'quiz'
-                    ? 'bg-indigo-600 text-white shadow-xs'
+                    ? 'bg-purple-600 text-white shadow-xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -3008,125 +3198,51 @@ export default function App() {
                 <span>Quiz</span>
               </button>
 
+              {/* Botão Ver Todos no Menu */}
               <button
-                id="tab-shop-btn"
-                onClick={() => setActiveTab('shop')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'shop'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Loja de Roupas: simule compras em mandarim, pergunte e responda preços por extenso"
+                type="button"
+                onClick={() => setIsModesMenuOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer whitespace-nowrap"
+                title="Ver lista detalhada de todos os modos e ferramentas"
               >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Loja</span>
-                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
-                  activeTab === 'shop' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
-                }`}>
-                  Roupas
-                </span>
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Ver Todos</span>
               </button>
+
             </div>
-
-            {/* Chinese Numbers Guide & Converter Modal Button */}
-            <button
-              id="open-numbers-btn"
-              type="button"
-              onClick={() => setIsNumbersModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-xs transition-all cursor-pointer"
-              title="Guia e Conversor de Números por Extenso em Mandarim (Regras 4.1 a 4.5)"
-            >
-              <Hash className="w-4 h-4 text-indigo-600" />
-              <span className="hidden sm:inline">Números</span>
-            </button>
-
-            {/* Dictionary Modal Button (Single global button) */}
-            <button
-              id="open-dictionary-btn"
-              onClick={() => setIsDictionaryOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-xs transition-all cursor-pointer"
-              title="Abrir dicionário visual completo com filtros por categoria e nível HSK"
-            >
-              <BookOpen className="w-4 h-4 text-indigo-600" />
-              <span className="hidden sm:inline">Dicionário</span>
-            </button>
-
-            {/* Não Confundir / Falsos Cognatos & Homófonos Modal Button */}
-            <button
-              id="open-false-friends-btn"
-              type="button"
-              onClick={() => setIsFalseFriendsOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-800 shadow-xs transition-all cursor-pointer"
-              title="Não Confundir! Guia de Falsos Cognatos e Homófonos no Mandarim (Item 17.1.1)"
-            >
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span className="hidden sm:inline">Não Confundir</span>
-            </button>
-
-            {/* User Profile Pill & Sign Out */}
-            {currentUser && (
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-                <div 
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                  title={`Conectado como: ${currentUser.displayName || currentUser.email || 'Usuário Google'}${isSuperUser(currentUser) ? ' (Superusuário)' : ''}`}
-                >
-                  {currentUser.photoURL ? (
-                    <img 
-                      src={currentUser.photoURL} 
-                      alt="Avatar" 
-                      className="w-5 h-5 rounded-full object-cover" 
-                      referrerPolicy="no-referrer" 
-                    />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center">
-                      {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="font-semibold text-slate-700 max-w-[120px] truncate hidden md:inline">
-                    {currentUser.displayName || currentUser.email}
-                  </span>
-                  {isSuperUser(currentUser) && (
-                    <span className="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-900 font-bold text-[9px] flex items-center gap-0.5">
-                      👑 Superusuário
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  id="btn-logout-google"
-                  type="button"
-                  onClick={() => signOutUser()}
-                  className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
-                  title="Sair da conta Google"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            )}
           </div>
-        </div>
+        </header>
 
-        {/* View Switch: Bate-papo (com construtor de frases integrado), Modo Hanzi, Quiz, ou Prática */}
+        {/* View Switch: Bate-papo (com construtor de frases integrado), Caça-níqueis, Modo Hanzi, Quiz, ou Prática */}
         {activeTab === 'chat' ? (
-          <ChatMode
-            currentUser={currentUser}
-            allWords={WORDS}
-            builderPhrase={sequence.length > 0 ? {
-              hanzi: sequence.map(w => w.hanzi).join(""),
-              pinyin: sequence.map(w => w.label).join(" "),
-              portuguese: getNaturalTranslation(sequence),
-              words: sequence,
-              isValid: isValidSentence
-            } : undefined}
-            builderSequence={sequence}
-            setBuilderSequence={setSequence}
-            builderInsertIndex={insertIndex}
-            setBuilderInsertIndex={setInsertIndex}
-            getAvailableWords={getAvailableWordsForSequence}
-            checkIsValidSentence={checkIsValid}
-            getNaturalTranslation={getNaturalTranslation}
-            validateAndBuildPhrase={validateAndBuildPhrase}
-          />
+          !currentUser ? (
+            <GoogleLoginGate
+              isInline={true}
+              onSuccess={() => {}}
+            />
+          ) : (
+            <ChatMode
+              currentUser={currentUser}
+              allWords={WORDS}
+              builderPhrase={sequence.length > 0 ? {
+                hanzi: sequence.map(w => w.hanzi).join(""),
+                pinyin: sequence.map(w => w.label).join(" "),
+                portuguese: getNaturalTranslation(sequence),
+                words: sequence,
+                isValid: isValidSentence
+              } : undefined}
+              builderSequence={sequence}
+              setBuilderSequence={setSequence}
+              builderInsertIndex={insertIndex}
+              setBuilderInsertIndex={setInsertIndex}
+              getAvailableWords={getAvailableWordsForSequence}
+              checkIsValidSentence={checkIsValid}
+              getNaturalTranslation={getNaturalTranslation}
+              validateAndBuildPhrase={validateAndBuildPhrase}
+            />
+          )
+        ) : activeTab === "slots" ? (
+          <SlotMachineMode />
         ) : activeTab === "flashcards" ? (
           <HanziFlashcardsMode
             allWords={WORDS}
@@ -3192,6 +3308,91 @@ export default function App() {
         <FalseFriendsModal
           isOpen={isFalseFriendsOpen}
           onClose={() => setIsFalseFriendsOpen(false)}
+        />
+
+        {/* Mobile Sticky Bottom Navigation Bar (md:hidden) */}
+        <nav 
+          aria-label="Navegação Rápida de Modos no Celular"
+          className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-2xl px-2 py-1.5 flex items-center justify-around safe-area-bottom"
+        >
+          <button
+            type="button"
+            id="mobile-bottom-slots-btn"
+            onClick={() => setActiveTab('slots')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'slots' 
+                ? 'text-amber-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span className="text-lg leading-none">🎰</span>
+            <span className="text-[10px] font-bold">Níqueis</span>
+          </button>
+
+          <button
+            type="button"
+            id="mobile-bottom-shop-btn"
+            onClick={() => setActiveTab('shop')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'shop' 
+                ? 'text-rose-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Loja</span>
+          </button>
+
+          <button
+            type="button"
+            id="mobile-bottom-practice-btn"
+            onClick={() => setActiveTab('practice')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'practice' 
+                ? 'text-indigo-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Prática</span>
+          </button>
+
+          <button
+            type="button"
+            id="mobile-bottom-chat-btn"
+            onClick={() => setActiveTab('chat')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'chat' 
+                ? 'text-indigo-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span className="text-[10px] font-bold">Bate-papo</span>
+          </button>
+
+          <button
+            type="button"
+            id="mobile-bottom-menu-btn"
+            onClick={() => setIsModesMenuOpen(true)}
+            className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl text-indigo-700 hover:text-indigo-900 transition-all cursor-pointer active:scale-95"
+          >
+            <div className="w-5 h-4 flex items-center justify-center">
+              <Menu className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black">+ Modos</span>
+          </button>
+        </nav>
+
+        {/* Modal Organizador de Todos os Modos */}
+        <ModesMenuModal
+          isOpen={isModesMenuOpen}
+          onClose={() => setIsModesMenuOpen(false)}
+          activeTab={activeTab}
+          onSelectTab={(tab) => setActiveTab(tab)}
+          onOpenDictionary={() => setIsDictionaryOpen(true)}
+          onOpenNumbers={() => setIsNumbersModalOpen(true)}
+          onOpenFalseFriends={() => setIsFalseFriendsOpen(true)}
         />
       </div>
     </div>
