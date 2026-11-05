@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   User, Users, MessageSquare, UserCheck, Globe, 
   Flag, Type, HelpCircle, Search, Info, PlusSquare, 
@@ -2689,11 +2689,101 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
   return { success: true, stoppedAtIndex: null, errorTip: null };
 }
 
+// Helper to convert an app tab into its canonical URL slug
+export const getTabSlug = (tab: AppModeTab): string => {
+  switch (tab) {
+    case 'slots': return 'cassino';
+    case 'shop': return 'loja';
+    case 'practice': return 'pratica';
+    case 'chat': return 'chat';
+    case 'flashcards': return 'flashcards';
+    case 'hanzi': return 'hanzi';
+    case 'quiz': return 'quiz';
+    default: return 'chat';
+  }
+};
+
+// Parser to inspect the current browser URL (path, hash or query) and resolve the corresponding mode or modal
+export const parseRouteLocation = (): {
+  tab?: AppModeTab;
+  modal?: 'dictionary' | 'numbers' | 'false_friends';
+} => {
+  if (typeof window === 'undefined') return { tab: 'chat' };
+
+  // Parse path, hash or search param
+  const pathname = window.location.pathname.replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+  const hash = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '').toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  const query = (
+    searchParams.get('modo') || 
+    searchParams.get('rota') || 
+    searchParams.get('route') || 
+    searchParams.get('tab') || 
+    ''
+  ).toLowerCase();
+
+  const slug = pathname || hash || query;
+
+  if (!slug) return { tab: 'chat' };
+
+  // Modals requested by user:
+  // * nao-conf : "Não confundir"
+  if (slug === 'nao-conf' || slug === 'naoconf' || slug === 'nao-confundir' || slug === 'naoconfundir' || slug === 'falsos-cognatos') {
+    return { modal: 'false_friends' };
+  }
+  // * dic/dicionario : Dicionário
+  if (slug === 'dic' || slug === 'dicionario' || slug === 'dicionário' || slug === 'dictionary') {
+    return { modal: 'dictionary' };
+  }
+  // * num : Números chineses por extenso
+  if (slug === 'num' || slug === 'numeros' || slug === 'números' || slug === 'numbers') {
+    return { modal: 'numbers' };
+  }
+
+  // App Modes requested by user:
+  // * cassino : para o modo caça-níqueis
+  if (slug === 'cassino' || slug === 'caca-niqueis' || slug === 'cacaniqueis' || slug === 'slots' || slug === 'slot' || slug === 'niqueis') {
+    return { tab: 'slots' };
+  }
+  // * loja
+  if (slug === 'loja' || slug === 'shop' || slug === 'roupas') {
+    return { tab: 'shop' };
+  }
+  // * chat : bate-papo
+  if (slug === 'chat' || slug === 'bate-papo' || slug === 'batepapo' || slug === 'conversa') {
+    return { tab: 'chat' };
+  }
+  // * pratica
+  if (slug === 'pratica' || slug === 'prática' || slug === 'practice') {
+    return { tab: 'practice' };
+  }
+  // * flashcards
+  if (slug === 'flashcards' || slug === 'flashcard' || slug === 'cards') {
+    return { tab: 'flashcards' };
+  }
+  // * hanzi
+  if (slug === 'hanzi' || slug === 'desenho') {
+    return { tab: 'hanzi' };
+  }
+  // * quiz
+  if (slug === 'quiz' || slug === 'teste') {
+    return { tab: 'quiz' };
+  }
+
+  return { tab: 'chat' };
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
-  const [isNumbersModalOpen, setIsNumbersModalOpen] = useState<boolean>(false);
-  const [isFalseFriendsOpen, setIsFalseFriendsOpen] = useState<boolean>(false);
+
+  // Parse initial route directly from the URL (path, hash or query)
+  const initialRoute = useMemo(() => parseRouteLocation(), []);
+  const [activeTab, setActiveTab] = useState<AppModeTab>(initialRoute.tab || 'chat');
+  const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(initialRoute.modal === 'dictionary');
+  const [isNumbersModalOpen, setIsNumbersModalOpen] = useState<boolean>(initialRoute.modal === 'numbers');
+  const [isFalseFriendsOpen, setIsFalseFriendsOpen] = useState<boolean>(initialRoute.modal === 'false_friends');
+  const [isModesMenuOpen, setIsModesMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -2703,9 +2793,101 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<AppModeTab>('chat');
-  const [isModesMenuOpen, setIsModesMenuOpen] = useState<boolean>(false);
-  const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
+  // Listen to browser Back/Forward (popstate) and hash changes
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const route = parseRouteLocation();
+      if (route.modal) {
+        if (route.modal === 'dictionary') {
+          setIsDictionaryOpen(true);
+          setIsNumbersModalOpen(false);
+          setIsFalseFriendsOpen(false);
+        } else if (route.modal === 'numbers') {
+          setIsNumbersModalOpen(true);
+          setIsDictionaryOpen(false);
+          setIsFalseFriendsOpen(false);
+        } else if (route.modal === 'false_friends') {
+          setIsFalseFriendsOpen(true);
+          setIsDictionaryOpen(false);
+          setIsNumbersModalOpen(false);
+        }
+      } else if (route.tab) {
+        setActiveTab(route.tab);
+        setIsDictionaryOpen(false);
+        setIsNumbersModalOpen(false);
+        setIsFalseFriendsOpen(false);
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // Navigation handlers keeping the URL in sync with the route
+  const navigateToTab = useCallback((tab: AppModeTab, replace = false) => {
+    setActiveTab(tab);
+    setIsDictionaryOpen(false);
+    setIsNumbersModalOpen(false);
+    setIsFalseFriendsOpen(false);
+
+    if (typeof window !== 'undefined') {
+      const slug = getTabSlug(tab);
+      const targetPath = `/${slug}`;
+      if (window.location.pathname !== targetPath && window.location.hash !== `#${slug}`) {
+        if (replace) {
+          window.history.replaceState({ tab }, '', targetPath);
+        } else {
+          window.history.pushState({ tab }, '', targetPath);
+        }
+      }
+    }
+  }, []);
+
+  const openDictionary = useCallback(() => {
+    setIsDictionaryOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'dictionary' }, '', '/dicionario');
+    }
+  }, []);
+
+  const closeDictionary = useCallback(() => {
+    setIsDictionaryOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
+
+  const openNumbers = useCallback(() => {
+    setIsNumbersModalOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'numbers' }, '', '/num');
+    }
+  }, []);
+
+  const closeNumbers = useCallback(() => {
+    setIsNumbersModalOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
+
+  const openFalseFriends = useCallback(() => {
+    setIsFalseFriendsOpen(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'false_friends' }, '', '/nao-conf');
+    }
+  }, []);
+
+  const closeFalseFriends = useCallback(() => {
+    setIsFalseFriendsOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
 
   const currentModeInfo = useMemo(() => {
     switch (activeTab) {
@@ -2992,7 +3174,7 @@ export default function App() {
                 <button
                   type="button"
                   id="open-dictionary-btn"
-                  onClick={() => setIsDictionaryOpen(true)}
+                  onClick={openDictionary}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                   title="Abrir dicionário visual completo"
                 >
@@ -3003,7 +3185,7 @@ export default function App() {
                 <button
                   type="button"
                   id="open-numbers-btn"
-                  onClick={() => setIsNumbersModalOpen(true)}
+                  onClick={openNumbers}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                   title="Guia e Conversor de Números por Extenso em Mandarim"
                 >
@@ -3014,7 +3196,7 @@ export default function App() {
                 <button
                   type="button"
                   id="open-false-friends-btn"
-                  onClick={() => setIsFalseFriendsOpen(true)}
+                  onClick={openFalseFriends}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100/80 transition-colors cursor-pointer border border-amber-200/60"
                   title="Não Confundir! Falsos Cognatos e Homófonos no Mandarim"
                 >
@@ -3091,7 +3273,7 @@ export default function App() {
               
               <button
                 id="tab-slots-btn"
-                onClick={() => setActiveTab('slots')}
+                onClick={() => navigateToTab('slots')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'slots'
                     ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
@@ -3110,7 +3292,7 @@ export default function App() {
 
               <button
                 id="tab-shop-btn"
-                onClick={() => setActiveTab('shop')}
+                onClick={() => navigateToTab('shop')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'shop'
                     ? 'bg-rose-600 text-white shadow-xs font-black'
@@ -3129,7 +3311,7 @@ export default function App() {
 
               <button
                 id="tab-chat-btn"
-                onClick={() => setActiveTab('chat')}
+                onClick={() => navigateToTab('chat')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'chat'
                     ? 'bg-indigo-600 text-white shadow-xs font-black'
@@ -3148,7 +3330,7 @@ export default function App() {
 
               <button
                 id="tab-practice-btn"
-                onClick={() => setActiveTab('practice')}
+                onClick={() => navigateToTab('practice')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'practice'
                     ? 'bg-indigo-600 text-white shadow-xs font-black'
@@ -3161,7 +3343,7 @@ export default function App() {
 
               <button
                 id="tab-flashcards-btn"
-                onClick={() => setActiveTab('flashcards')}
+                onClick={() => navigateToTab('flashcards')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'flashcards'
                     ? 'bg-amber-600 text-white shadow-xs font-black'
@@ -3174,7 +3356,7 @@ export default function App() {
 
               <button
                 id="tab-hanzi-btn"
-                onClick={() => setActiveTab('hanzi')}
+                onClick={() => navigateToTab('hanzi')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'hanzi'
                     ? 'bg-rose-600 text-white shadow-xs font-black'
@@ -3187,7 +3369,7 @@ export default function App() {
 
               <button
                 id="tab-quiz-btn"
-                onClick={() => setActiveTab('quiz')}
+                onClick={() => navigateToTab('quiz')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'quiz'
                     ? 'bg-purple-600 text-white shadow-xs font-black'
@@ -3247,12 +3429,12 @@ export default function App() {
           <HanziFlashcardsMode
             allWords={WORDS}
             onOpenCanvasWithChar={(char) => {
-              setActiveTab("hanzi");
+              navigateToTab("hanzi");
             }}
             onSendToBuilder={(words) => {
               setSequence(prev => [...prev, ...words]);
               setInsertIndex(prev => prev + words.length);
-              setActiveTab("chat");
+              navigateToTab("chat");
             }}
           />
         ) : activeTab === "hanzi" ? (
@@ -3261,7 +3443,7 @@ export default function App() {
             onSendToBuilder={(words) => {
               setSequence(words);
               setInsertIndex(words.length);
-              setActiveTab("chat");
+              navigateToTab("chat");
             }}
           />
         ) : activeTab === "quiz" ? (
@@ -3270,7 +3452,7 @@ export default function App() {
             validateAndBuildPhrase={validateAndBuildPhrase}
           />
         ) : activeTab === "shop" ? (
-          <ShopMode onOpenNumbersModal={() => setIsNumbersModalOpen(true)} />
+          <ShopMode onOpenNumbersModal={openNumbers} />
         ) : (
           <PracticeMode
             allWords={WORDS}
@@ -3284,11 +3466,11 @@ export default function App() {
         {/* Global Searchable Visual Dictionary Modal */}
         <DictionaryModal
           isOpen={isDictionaryOpen}
-          onClose={() => setIsDictionaryOpen(false)}
+          onClose={closeDictionary}
           words={WORDS}
           onSelectWord={(w) => {
             addWord(w);
-            setIsDictionaryOpen(false);
+            closeDictionary();
           }}
           availableWordIds={availableWords.map(w => w.id)}
         />
@@ -3296,7 +3478,7 @@ export default function App() {
         {/* Modal de Números por Extenso em Mandarim (Regras 4.1 a 4.5) */}
         <ChineseNumbersModal
           isOpen={isNumbersModalOpen}
-          onClose={() => setIsNumbersModalOpen(false)}
+          onClose={closeNumbers}
           allWords={WORDS}
           onInsertWords={(words) => {
             setSequence(prev => [...prev, ...words]);
@@ -3307,7 +3489,7 @@ export default function App() {
         {/* Modal de Não Confundir: Falsos Cognatos e Homófonos no Mandarim (Item 17.1.1) */}
         <FalseFriendsModal
           isOpen={isFalseFriendsOpen}
-          onClose={() => setIsFalseFriendsOpen(false)}
+          onClose={closeFalseFriends}
         />
 
         {/* Mobile Sticky Bottom Navigation Bar (md:hidden) */}
@@ -3318,7 +3500,7 @@ export default function App() {
           <button
             type="button"
             id="mobile-bottom-slots-btn"
-            onClick={() => setActiveTab('slots')}
+            onClick={() => navigateToTab('slots')}
             className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
               activeTab === 'slots' 
                 ? 'text-amber-600 font-black scale-105' 
@@ -3332,7 +3514,7 @@ export default function App() {
           <button
             type="button"
             id="mobile-bottom-shop-btn"
-            onClick={() => setActiveTab('shop')}
+            onClick={() => navigateToTab('shop')}
             className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
               activeTab === 'shop' 
                 ? 'text-rose-600 font-black scale-105' 
@@ -3346,7 +3528,7 @@ export default function App() {
           <button
             type="button"
             id="mobile-bottom-practice-btn"
-            onClick={() => setActiveTab('practice')}
+            onClick={() => navigateToTab('practice')}
             className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
               activeTab === 'practice' 
                 ? 'text-indigo-600 font-black scale-105' 
@@ -3360,7 +3542,7 @@ export default function App() {
           <button
             type="button"
             id="mobile-bottom-chat-btn"
-            onClick={() => setActiveTab('chat')}
+            onClick={() => navigateToTab('chat')}
             className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
               activeTab === 'chat' 
                 ? 'text-indigo-600 font-black scale-105' 
@@ -3389,10 +3571,10 @@ export default function App() {
           isOpen={isModesMenuOpen}
           onClose={() => setIsModesMenuOpen(false)}
           activeTab={activeTab}
-          onSelectTab={(tab) => setActiveTab(tab)}
-          onOpenDictionary={() => setIsDictionaryOpen(true)}
-          onOpenNumbers={() => setIsNumbersModalOpen(true)}
-          onOpenFalseFriends={() => setIsFalseFriendsOpen(true)}
+          onSelectTab={(tab) => navigateToTab(tab)}
+          onOpenDictionary={openDictionary}
+          onOpenNumbers={openNumbers}
+          onOpenFalseFriends={openFalseFriends}
         />
       </div>
     </div>
