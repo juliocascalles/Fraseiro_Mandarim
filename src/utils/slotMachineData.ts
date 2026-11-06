@@ -14,11 +14,15 @@ export interface ReelSubjectItem {
   person: '1s' | '2s' | '3s' | '1p';
 }
 
+export type LocationPrepType = 'zai' | 'qu' | 'xiang_qu';
+
 export interface ReelLocationItem {
   id: string;
-  hanzi: string; // e.g. "在超市"
-  pinyin: string; // e.g. "zài chāoshì"
-  pt: string; // e.g. "no supermercado"
+  prep: LocationPrepType;
+  placeName: string;
+  hanzi: string; // e.g. "在超市", "去超市", "想去超市"
+  pinyin: string; // e.g. "zài chāoshì", "qù chāoshì", "xiǎng qù chāoshì"
+  pt: string; // e.g. "no supermercado", "ao supermercado"
 }
 
 export interface ReelVerbItem {
@@ -26,6 +30,7 @@ export interface ReelVerbItem {
   hanzi: string;
   pinyin: string;
   lemma: string;
+  infinitive: string;
   conjugations: {
     present: Record<'1s' | '2s' | '3s' | '1p', string>;
     past: Record<'1s' | '2s' | '3s' | '1p', string>;
@@ -66,14 +71,45 @@ export const SUBJECT_REEL: ReelSubjectItem[] = [
 ];
 
 export const LOCATION_REEL: ReelLocationItem[] = [
-  { id: 'chaoshi', hanzi: '在超市', pinyin: 'zài chāoshì', pt: 'no supermercado' },
-  { id: 'shangdian', hanzi: '在商店', pinyin: 'zài shāngdiàn', pt: 'na loja' },
-  { id: 'fuzhuangdian', hanzi: '在服装店', pinyin: 'zài fúzhuāngdiàn', pt: 'na loja de roupas' },
-  { id: 'fanguan', hanzi: '在饭馆', pinyin: 'zài fànguǎn', pt: 'no restaurante' },
-  { id: 'xuexiao', hanzi: '在学校', pinyin: 'zài xuéxiào', pt: 'na escola' },
-  { id: 'gongyuan', hanzi: '在公园', pinyin: 'zài gōngyuán', pt: 'no parque' },
-  { id: 'jia', hanzi: '在家', pinyin: 'zài jiā', pt: 'em casa' },
-  { id: 'shudian', hanzi: '在书店', pinyin: 'zài shūdiàn', pt: 'na livraria' },
+  // Supermercado
+  { id: 'chaoshi_zai', prep: 'zai', placeName: 'supermercado', hanzi: '在超市', pinyin: 'zài chāoshì', pt: 'no supermercado' },
+  { id: 'chaoshi_qu', prep: 'qu', placeName: 'supermercado', hanzi: '去超市', pinyin: 'qù chāoshì', pt: 'ao supermercado' },
+  { id: 'chaoshi_xiangqu', prep: 'xiang_qu', placeName: 'supermercado', hanzi: '想去超市', pinyin: 'xiǎng qù chāoshì', pt: 'ao supermercado' },
+  
+  // Loja
+  { id: 'shangdian_zai', prep: 'zai', placeName: 'loja', hanzi: '在商店', pinyin: 'zài shāngdiàn', pt: 'na loja' },
+  { id: 'shangdian_qu', prep: 'qu', placeName: 'loja', hanzi: '去商店', pinyin: 'qù shāngdiàn', pt: 'à loja' },
+  { id: 'shangdian_xiangqu', prep: 'xiang_qu', placeName: 'loja', hanzi: '想去商店', pinyin: 'xiǎng qù shāngdiàn', pt: 'à loja' },
+
+  // Loja de roupas
+  { id: 'fuzhuangdian_zai', prep: 'zai', placeName: 'loja de roupas', hanzi: '在服装店', pinyin: 'zài fúzhuāngdiàn', pt: 'na loja de roupas' },
+  { id: 'fuzhuangdian_qu', prep: 'qu', placeName: 'loja de roupas', hanzi: '去服装店', pinyin: 'qù fúzhuāngdiàn', pt: 'à loja de roupas' },
+  { id: 'fuzhuangdian_xiangqu', prep: 'xiang_qu', placeName: 'loja de roupas', hanzi: '想去服装店', pinyin: 'xiǎng qù fúzhuāngdiàn', pt: 'à loja de roupas' },
+
+  // Restaurante
+  { id: 'fanguan_zai', prep: 'zai', placeName: 'restaurante', hanzi: '在饭馆', pinyin: 'zài fànguǎn', pt: 'no restaurante' },
+  { id: 'fanguan_qu', prep: 'qu', placeName: 'restaurante', hanzi: '去饭馆', pinyin: 'qù fànguǎn', pt: 'ao restaurante' },
+  { id: 'fanguan_xiangqu', prep: 'xiang_qu', placeName: 'restaurante', hanzi: '想去饭馆', pinyin: 'xiǎng qù fànguǎn', pt: 'ao restaurante' },
+
+  // Escola
+  { id: 'xuexiao_zai', prep: 'zai', placeName: 'escola', hanzi: '在学校', pinyin: 'zài xuéxiào', pt: 'na escola' },
+  { id: 'xuexiao_qu', prep: 'qu', placeName: 'escola', hanzi: '去学校', pinyin: 'qù xuéxiào', pt: 'à escola' },
+  { id: 'xuexiao_xiangqu', prep: 'xiang_qu', placeName: 'escola', hanzi: '想去学校', pinyin: 'xiǎng qù xuéxiào', pt: 'à escola' },
+
+  // Parque
+  { id: 'gongyuan_zai', prep: 'zai', placeName: 'parque', hanzi: '在公园', pinyin: 'zài gōngyuán', pt: 'no parque' },
+  { id: 'gongyuan_qu', prep: 'qu', placeName: 'parque', hanzi: '去公园', pinyin: 'qù gōngyuán', pt: 'ao parque' },
+  { id: 'gongyuan_xiangqu', prep: 'xiang_qu', placeName: 'parque', hanzi: '想去公园', pinyin: 'xiǎng qù gōngyuán', pt: 'ao parque' },
+
+  // Casa
+  { id: 'jia_zai', prep: 'zai', placeName: 'casa', hanzi: '在家', pinyin: 'zài jiā', pt: 'em casa' },
+  { id: 'jia_qu', prep: 'qu', placeName: 'casa', hanzi: '去家', pinyin: 'qù jiā', pt: 'para casa' },
+  { id: 'jia_xiangqu', prep: 'xiang_qu', placeName: 'casa', hanzi: '想回家', pinyin: 'xiǎng huí jiā', pt: 'para casa' },
+
+  // Livraria
+  { id: 'shudian_zai', prep: 'zai', placeName: 'livraria', hanzi: '在书店', pinyin: 'zài shūdiàn', pt: 'na livraria' },
+  { id: 'shudian_qu', prep: 'qu', placeName: 'livraria', hanzi: '去书店', pinyin: 'qù shūdiàn', pt: 'à livraria' },
+  { id: 'shudian_xiangqu', prep: 'xiang_qu', placeName: 'livraria', hanzi: '想去书店', pinyin: 'xiǎng qù shūdiàn', pt: 'à livraria' },
 ];
 
 export const VERB_REEL: ReelVerbItem[] = [
@@ -82,42 +118,46 @@ export const VERB_REEL: ReelVerbItem[] = [
     hanzi: '卖',
     pinyin: 'mài',
     lemma: 'vender',
+    infinitive: 'vender',
     conjugations: {
       present: { '1s': 'vendo', '2s': 'vende', '3s': 'vende', '1p': 'vendemos' },
       past: { '1s': 'vendi', '2s': 'vendeu', '3s': 'vendeu', '1p': 'vendemos' },
       future: { '1s': 'vou vender', '2s': 'vai vender', '3s': 'vai vender', '1p': 'vamos vender' },
     },
-    allowedObjectIds: ['pingguo', 'shuiguo', 'yifu', 'waitao', 'duanxiu', 'shu', 'dangao', 'cha', 'kafei'],
+    allowedObjectIds: ['pingguo', 'shuiguo', 'yifu', 'waitao', 'duanxiu', 'shu', 'dangao', 'cha', 'kafei', 'yidalimian'],
   },
   {
     id: 'mai_buy',
     hanzi: '买',
     pinyin: 'mǎi',
     lemma: 'comprar',
+    infinitive: 'comprar',
     conjugations: {
       present: { '1s': 'compro', '2s': 'compra', '3s': 'compra', '1p': 'compramos' },
       past: { '1s': 'comprei', '2s': 'comprou', '3s': 'comprou', '1p': 'compramos' },
       future: { '1s': 'vou comprar', '2s': 'vai comprar', '3s': 'vai comprar', '1p': 'vamos comprar' },
     },
-    allowedObjectIds: ['pingguo', 'shuiguo', 'yifu', 'waitao', 'duanxiu', 'shu', 'dangao', 'cha', 'kafei', 'mianbao'],
+    allowedObjectIds: ['pingguo', 'shuiguo', 'yifu', 'waitao', 'duanxiu', 'shu', 'dangao', 'cha', 'kafei', 'mianbao', 'yidalimian', 'miantiao'],
   },
   {
     id: 'chi',
     hanzi: '吃',
     pinyin: 'chī',
     lemma: 'comer',
+    infinitive: 'comer',
     conjugations: {
       present: { '1s': 'como', '2s': 'come', '3s': 'come', '1p': 'comemos' },
       past: { '1s': 'comi', '2s': 'comeu', '3s': 'comeu', '1p': 'comemos' },
       future: { '1s': 'vou comer', '2s': 'vai comer', '3s': 'vai comer', '1p': 'vamos comer' },
     },
-    allowedObjectIds: ['pingguo', 'shuiguo', 'dangao', 'mifan', 'miantiao', 'mianbao'],
+    allowedObjectIds: ['pingguo', 'shuiguo', 'dangao', 'mifan', 'miantiao', 'mianbao', 'yidalimian'],
   },
   {
     id: 'he',
     hanzi: '喝',
     pinyin: 'hē',
     lemma: 'beber',
+    infinitive: 'beber',
     conjugations: {
       present: { '1s': 'bebo', '2s': 'bebe', '3s': 'bebe', '1p': 'bebemos' },
       past: { '1s': 'bebi', '2s': 'bebeu', '3s': 'bebeu', '1p': 'bebemos' },
@@ -130,6 +170,7 @@ export const VERB_REEL: ReelVerbItem[] = [
     hanzi: '看',
     pinyin: 'kàn',
     lemma: 'ver/ler',
+    infinitive: 'ler',
     conjugations: {
       present: { '1s': 'leio', '2s': 'lê', '3s': 'lê', '1p': 'lemos' },
       past: { '1s': 'li', '2s': 'leu', '3s': 'leu', '1p': 'lemos' },
@@ -142,6 +183,7 @@ export const VERB_REEL: ReelVerbItem[] = [
     hanzi: '找',
     pinyin: 'zhǎo',
     lemma: 'procurar',
+    infinitive: 'procurar',
     conjugations: {
       present: { '1s': 'procuro', '2s': 'procura', '3s': 'procura', '1p': 'procuramos' },
       past: { '1s': 'procurei', '2s': 'procurou', '3s': 'procurou', '1p': 'procuramos' },
@@ -152,11 +194,12 @@ export const VERB_REEL: ReelVerbItem[] = [
 ];
 
 export const OBJECT_REEL: ReelObjectItem[] = [
+  { id: 'yidalimian', hanzi: '意大利面', pinyin: 'yìdàlìmiàn', pt: 'macarrão', category: 'food' },
+  { id: 'miantiao', hanzi: '面条', pinyin: 'miàntiáo', pt: 'macarrão chinês', category: 'food' },
   { id: 'pingguo', hanzi: '苹果', pinyin: 'píngguǒ', pt: 'maçãs', category: 'food' },
   { id: 'shuiguo', hanzi: '水果', pinyin: 'shuǐguǒ', pt: 'frutas', category: 'food' },
   { id: 'dangao', hanzi: '蛋糕', pinyin: 'dàngāo', pt: 'bolo', category: 'food' },
   { id: 'mifan', hanzi: '米饭', pinyin: 'mǐfàn', pt: 'arroz', category: 'food' },
-  { id: 'miantiao', hanzi: '面条', pinyin: 'miàntiáo', pt: 'macarrão', category: 'food' },
   { id: 'mianbao', hanzi: '面包', pinyin: 'miànbāo', pt: 'pão', category: 'food' },
   { id: 'cha', hanzi: '茶', pinyin: 'chá', pt: 'chá', category: 'drink' },
   { id: 'kafei', hanzi: '咖啡', pinyin: 'kāfēi', pt: 'café', category: 'drink' },
@@ -194,6 +237,42 @@ export function buildSlotTranslation(
   object: ReelObjectItem
 ): string {
   const tense = time.tense;
+  const person = subject.person;
+
+  // Verbo no infinitivo para sentenças de movimento ("ir fazer...")
+  let infStr = verb.infinitive || verb.lemma;
+  if (verb.id === 'kan' && object.id === 'zhaopian') {
+    infStr = 'ver';
+  }
+
+  // Caso 1: Deslocamento / Indo para o local com '去' (qù)
+  // Ex: 晚上他去超市买面条 = "Ele vai ao supermercado comprar macarrão à noite."
+  if (location.prep === 'qu') {
+    let goStr = 'vai';
+    if (tense === 'past') {
+      goStr = person === '1s' ? 'fui' : person === '1p' ? 'fomos' : 'foi';
+    } else {
+      goStr = person === '1s' ? 'vou' : person === '1p' ? 'vamos' : 'vai';
+    }
+    return `${subject.pt} ${goStr} ${location.pt} ${infStr} ${object.pt} ${time.pt}.`;
+  }
+
+  // Caso 2: Intenção / Quer ir ao local com '想去' (xiǎng qù)
+  // Exemplo do usuário: 他想去超市买意大利面 = "Ele quer ir ao supermercado comprar macarrão."
+  if (location.prep === 'xiang_qu') {
+    let wantGoStr = 'quer ir';
+    if (tense === 'past') {
+      wantGoStr = person === '1s' ? 'queria ir' : person === '1p' ? 'queríamos ir' : 'queria ir';
+    } else if (tense === 'future') {
+      wantGoStr = person === '1s' ? 'vou querer ir' : person === '1p' ? 'vamos querer ir' : 'vai querer ir';
+    } else {
+      wantGoStr = person === '1s' ? 'quero ir' : person === '1p' ? 'queremos ir' : 'quer ir';
+    }
+    return `${subject.pt} ${wantGoStr} ${location.pt} ${infStr} ${object.pt} ${time.pt}.`;
+  }
+
+  // Caso 3: No local realizando a ação com '在' (zài)
+  // Exemplo do usuário: 晚上他在超市卖苹果 = "Ele vende maçãs no supermercado à noite."
   let verbStr = verb.conjugations[tense][subject.person] || verb.conjugations.present[subject.person];
 
   // Ajuste especial para 'kan': com fotos/mapas traduz como 'vê/olha', com livros como 'lê'
@@ -207,9 +286,6 @@ export function buildSlotTranslation(
     }
   }
 
-  // Formato elegante da frase em português:
-  // "[Sujeito] [verbo conjugado] [objeto] [local com 'zai'] [tempo]."
-  // Ex: "Ele vende maçãs no supermercado à noite."
   return `${subject.pt} ${verbStr} ${object.pt} ${location.pt} ${time.pt}.`;
 }
 

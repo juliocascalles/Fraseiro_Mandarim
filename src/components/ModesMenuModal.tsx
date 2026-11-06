@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop';
+export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes';
 
 export interface ModeMenuItem {
   id: AppModeTab | 'numbers' | 'dictionary' | 'false_friends';
@@ -40,14 +40,26 @@ export interface ModeMenuItem {
 export const ALL_MODES_CONFIG: ModeMenuItem[] = [
   // 1. Jogos & Prática Ativa
   {
+    id: 'repeticoes',
+    title: 'Módulo Repetições',
+    hanzi: '叠词机器',
+    pinyin: 'diécí jīqì',
+    description: 'Esteira e Máquina Duplicadora: verbos suavizados (看看, 试一试, 等等), modéstia (哪里哪里) e universalidade (天天, 人人).',
+    category: 'games',
+    icon: '🔁',
+    badge: 'Novo',
+    badgeColor: 'bg-purple-600 text-white font-black',
+    themeColor: 'from-purple-600 to-indigo-600',
+  },
+  {
     id: 'slots',
     title: 'Caça-níqueis de Frases',
     hanzi: '老虎机',
     pinyin: 'lǎohǔjī',
-    description: 'Gire 5 faixas sintáticas (Tempo, Sujeito, Local, Verbo, Objeto) e adivinhe a tradução correta.',
+    description: 'Gire 5 faixas sintáticas (Tempo, Sujeito, Local com 在/去/想去, Verbo, Objeto) e adivinhe a tradução correta.',
     category: 'games',
     icon: '🎰',
-    badge: 'Novo',
+    badge: 'Slots',
     badgeColor: 'bg-amber-500 text-slate-950 font-black',
     themeColor: 'from-amber-500 to-yellow-500',
   },
@@ -435,7 +447,7 @@ export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
           <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Fraseiro Mandarim • v1.2026.11.04</span>
+              <span>Fraseiro Mandarim • v1.2026.11.05</span>
             </span>
             <span className="hidden sm:inline text-slate-400">
               Toque em qualquer card para alternar instantaneamente

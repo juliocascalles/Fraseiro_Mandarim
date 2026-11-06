@@ -42,6 +42,9 @@ export const SlotMachineMode: React.FC = () => {
   const [verbIdx, setVerbIdx] = useState<number>(0); // 卖
   const [objIdx, setObjIdx] = useState<number>(0);   // 苹果
 
+  // Filtro de preposição de local (Item 1: zài, qù, ou xiǎng qù)
+  const [locationPrepFilter, setLocationPrepFilter] = useState<'all' | 'zai' | 'qu' | 'xiang_qu'>('all');
+
   // Travas individuais das faixas (Hold / Lock)
   const [locks, setLocks] = useState<boolean[]>([false, false, false, false, false]);
 
@@ -80,7 +83,7 @@ export const SlotMachineMode: React.FC = () => {
       SUBJECT_REEL[2],  // 他
       LOCATION_REEL[0], // 在超市
       VERB_REEL[0],     // 卖
-      OBJECT_REEL[0]    // 苹果
+      OBJECT_REEL[2]    // 苹果
     );
     setCurrentSentence(initialSentence);
     setOptions(generateSlotOptions(initialSentence));
@@ -93,6 +96,34 @@ export const SlotMachineMode: React.FC = () => {
       copy[index] = !copy[index];
       return copy;
     });
+  };
+
+  // Carrega o exemplo exato pedido pelo usuário: "他想去超市买意大利面"
+  const loadTargetExample = () => {
+    if (isSpinning) return;
+    const targetSubj = 2; // 他
+    const targetLoc = LOCATION_REEL.findIndex(l => l.id === 'chaoshi_xiangqu'); // 想去超市
+    const targetVerb = VERB_REEL.findIndex(v => v.id === 'mai_buy'); // 买
+    const targetObj = OBJECT_REEL.findIndex(o => o.id === 'yidalimian'); // 意大利面
+    const targetTime = 0; // 晚上
+
+    setTimeIdx(targetTime);
+    setSubjIdx(targetSubj);
+    setLocIdx(targetLoc >= 0 ? targetLoc : 0);
+    setVerbIdx(targetVerb >= 0 ? targetVerb : 0);
+    setObjIdx(targetObj >= 0 ? targetObj : 0);
+
+    const s = createSlotSentence(
+      TIME_REEL[targetTime],
+      SUBJECT_REEL[targetSubj],
+      LOCATION_REEL[targetLoc >= 0 ? targetLoc : 0],
+      VERB_REEL[targetVerb >= 0 ? targetVerb : 0],
+      OBJECT_REEL[targetObj >= 0 ? targetObj : 0]
+    );
+    setCurrentSentence(s);
+    setOptions(generateSlotOptions(s));
+    setHasAnswered(false);
+    setSelectedOptionId(null);
   };
 
   const handlePullLever = () => {
@@ -115,7 +146,15 @@ export const SlotMachineMode: React.FC = () => {
     // Escolhe novos índices aleatórios respeitando compatibilidade de verbos/objetos
     const nextTime = locks[0] ? timeIdx : Math.floor(Math.random() * TIME_REEL.length);
     const nextSubj = locks[1] ? subjIdx : Math.floor(Math.random() * SUBJECT_REEL.length);
-    const nextLoc = locks[2] ? locIdx : Math.floor(Math.random() * LOCATION_REEL.length);
+
+    // Faixa de local respeitando filtro selecionado (zai, qu, xiang_qu)
+    let candidateLocs = LOCATION_REEL;
+    if (locationPrepFilter !== 'all') {
+      candidateLocs = LOCATION_REEL.filter(l => l.prep === locationPrepFilter);
+    }
+    const chosenLocItem = candidateLocs[Math.floor(Math.random() * candidateLocs.length)];
+    const nextLoc = locks[2] ? locIdx : LOCATION_REEL.findIndex(l => l.id === chosenLocItem.id);
+
     const nextVerb = locks[3] ? verbIdx : Math.floor(Math.random() * VERB_REEL.length);
 
     // Para o objeto: escolhe um objeto compatível com o verbo escolhido
@@ -226,7 +265,7 @@ export const SlotMachineMode: React.FC = () => {
                   <span className="text-amber-200 font-serif text-lg">老虎机 (Lǎohǔjī)</span>
                 </h2>
                 <span className="bg-amber-400/20 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300/40 uppercase">
-                  Modo Sintaxe 1.2026.11.04
+                  Modo Sintaxe 1.2026.11.05
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-amber-100 font-medium mt-0.5">
@@ -273,11 +312,72 @@ export const SlotMachineMode: React.FC = () => {
           <span className="opacity-40">➔</span>
           <span className="shrink-0 text-emerald-200">2. Sujeito (主语)</span>
           <span className="opacity-40">➔</span>
-          <span className="shrink-0 text-amber-200">3. Local com 在 (在 + 地点)</span>
+          <span className="shrink-0 text-amber-200">3. Local: 在 / 去 / 想去 + 地点</span>
           <span className="opacity-40">➔</span>
           <span className="shrink-0 text-rose-200">4. Verbo (动词)</span>
           <span className="opacity-40">➔</span>
           <span className="shrink-0 text-indigo-200">5. Objeto (宾语)</span>
+        </div>
+
+        {/* Filtros de Preposição de Local e Botão Exemplo do Usuário */}
+        <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-amber-300 font-bold text-[11px] flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-amber-400" /> Preposição de Local:
+            </span>
+            <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-lg border border-amber-400/30 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setLocationPrepFilter('all')}
+                className={`px-2 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                  locationPrepFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocationPrepFilter('zai')}
+                className={`px-2 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                  locationPrepFilter === 'zai' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
+                }`}
+                title="Ação ocorrendo dentro do local (在 + Local)"
+              >
+                在 (No local)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocationPrepFilter('qu')}
+                className={`px-2 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                  locationPrepFilter === 'qu' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
+                }`}
+                title="Deslocamento ao local para realizar a ação (去 + Local)"
+              >
+                去 (Indo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocationPrepFilter('xiang_qu')}
+                className={`px-2 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                  locationPrepFilter === 'xiang_qu' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
+                }`}
+                title="Intenção de ir ao local para realizar a ação (想去 + Local)"
+              >
+                想去 (Quer ir)
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadTargetExample}
+            disabled={isSpinning}
+            className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-amber-200 hover:text-white text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+            title="Carregar exemplo: 他想去超市买意大利面 (Ele quer ir ao supermercado comprar macarrão)"
+          >
+            <span>🍝</span>
+            <span>Exemplo: 想去 (Quer ir comprar macarrão)</span>
+          </button>
         </div>
       </div>
 

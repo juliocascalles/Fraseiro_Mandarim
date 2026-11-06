@@ -472,7 +472,7 @@ export const ShopMode: React.FC<ShopModeProps> = ({ onOpenNumbersModal }) => {
                   <span className="text-amber-200 font-serif text-lg">服装店 (Fúzhuāngdiàn)</span>
                 </h2>
                 <span className="bg-amber-400/20 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300/40 uppercase">
-                  Módulo 1.2026.11.04
+                  Módulo 1.2026.11.05
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-rose-100 font-medium mt-0.5">

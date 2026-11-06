@@ -15,7 +15,7 @@ import {
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
   Hash, LogOut, Flame, AlertTriangle, Calendar, ShoppingBag, Shirt, LogIn,
-  Menu, LayoutGrid, ChevronDown
+  Menu, LayoutGrid, ChevronDown, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -30,6 +30,7 @@ import { FalseFriendsModal } from './components/FalseFriendsModal';
 import { HanziFlashcardsMode } from './components/HanziFlashcardsMode';
 import { ShopMode } from './components/ShopMode';
 import { SlotMachineMode } from './components/SlotMachineMode';
+import { ReduplicationMode } from './components/ReduplicationMode';
 import { ModesMenuModal, AppModeTab } from './components/ModesMenuModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
@@ -116,6 +117,9 @@ const WORDS: Word[] = [
   { id: 'paobu', label: 'pǎobù', hanzi: '跑步', translation: 'correr / corrida', category: 'verb', icon: Play, hskLevel: 'HSK 2' },
   { id: 'youyong_swim', label: 'yóuyǒng', hanzi: '游泳', translation: 'nadar / natação (esporte)', category: 'verb', icon: Droplets, hskLevel: 'HSK 2' },
   { id: 'xing', label: 'xíng', hanzi: '行', translation: 'ok / tudo bem / aceitável', category: 'verb', icon: CheckCircle2, hskLevel: 'HSK 2' },
+  { id: 'rang', label: 'ràng', hanzi: '让', translation: 'deixar / permitir / fazer com que', category: 'verb', icon: CheckCircle2, hskLevel: 'HSK 2' },
+  { id: 'deng', label: 'děng', hanzi: '等', translation: 'esperar', category: 'verb', icon: Clock, hskLevel: 'HSK 2' },
+  { id: 'shi_try', label: 'shì', hanzi: '试', translation: 'experimentar / provar / testar', category: 'verb', icon: Sparkles, hskLevel: 'HSK 2' },
 
   // Family & Home
   { id: 'jia', label: 'jia', hanzi: '家', translation: 'casa/família', category: 'family', icon: Home, hskLevel: 'HSK 1' },
@@ -250,6 +254,7 @@ const WORDS: Word[] = [
   { id: 'pingguo', label: 'píngguǒ', hanzi: '苹果', translation: 'maçã(s)', category: 'thing', icon: Heart, hskLevel: 'HSK 1' },
   { id: 'shuiguo', label: 'shuǐguǒ', hanzi: '水果', translation: 'fruta(s)', category: 'thing', icon: Heart, hskLevel: 'HSK 1' },
   { id: 'miantiao', label: 'miàntiáo', hanzi: '面条', translation: 'macarrão / talharim', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
+  { id: 'yidalimian', label: 'yìdàlìmiàn', hanzi: '意大利面', translation: 'macarrão / espaguete (massa italiana)', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'jiaozi', label: 'jiǎozi', hanzi: '饺子', translation: 'bolinhos chineses / guiozas', category: 'thing', icon: Utensils, hskLevel: 'HSK 2' },
   { id: 'kele', label: 'kělè', hanzi: '可乐', translation: 'Coca-Cola / refrigerante', category: 'thing', icon: CupSoda, hskLevel: 'HSK 2' },
   { id: 'qiu', label: 'qiú', hanzi: '球', translation: 'bola / esportes com bola', category: 'thing', icon: Target, hskLevel: 'HSK 1' },
@@ -1052,6 +1057,23 @@ function getNaturalTranslation(seq: Word[]): string {
     'zhe cidian shi laoshi de': 'Este dicionário é do professor.',
     'zhe ben ci dian shi lao shi de': 'Este dicionário é do professor.',
     'zhe ben cidian shi laoshi de': 'Este dicionário é do professor.',
+
+    // Novas Frases v1.2026.11.05:
+    // 3.1: Mamãe não me deixa brincar (mama bu rang wo wan)
+    'mama bu rang wo wan': 'Mamãe não me deixa brincar.',
+    'mama bu rang wo wanr': 'Mamãe não me deixa brincar.',
+    // 1: Ele quer ir ao supermercado comprar macarrão
+    'ta xiang qu chaoshi mai yidalimian': 'Ele quer ir ao supermercado comprar macarrão.',
+    'ta xiang qu chaoshi mai miantiao': 'Ele quer ir ao supermercado comprar macarrão.',
+    // 2.2: Posso experimentar a roupa?
+    'wo keyi shi yixia yifu ma': 'Eu posso experimentar a roupa?',
+    'wo keyi shi yi shi yifu ma': 'Eu posso experimentar a roupa?',
+    'wo keyi shi yishi yifu ma': 'Eu posso experimentar a roupa?',
+    'wo shi chi': 'Eu vou provar a comida / degustar.',
+    // 3.2: Esperar
+    'deng yixia': 'Espera um pouco.',
+    'deng deng wo': 'Me espera!',
+    'deng wo': 'Me espera!',
   };
 
   // Regra especial: se a frase termina com 'wo jiao' (我叫), colocar o nome do usuário na frente
@@ -1145,6 +1167,9 @@ function checkIsValid(seq: Word[]): boolean {
 
   // If ending in 'xing' (行) - e.g. "xing", "bu xing", "wo kan yixia xing bu xing"
   if (last.id === 'xing') return true;
+
+  // If ending in 'yixia' (一下) - e.g. "deng yixia", "wo kan yixia"
+  if (last.id === 'yixia') return true;
 
   // If ending in 'yisi' (意思)
   if (last.id === 'yisi') {
@@ -1334,6 +1359,11 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           });
         }
 
+        // If preceded by rang (ex: mama bu rang wo wan - mamãe não me deixa brincar)
+        if (prev?.id === 'rang') {
+          return WORDS.filter(w => ['wan', 'chi', 'he', 'qu_verb', 'kan', 'xuexi', 'mai', 'xie', 'shuo', 'da_sport', 'paobu', 'youyong_swim'].includes(w.id) || w.category === 'verb');
+        }
+
         if (activeVerb?.id === 'xihuan') {
           return WORDS.filter(w => {
             if (w.id === 'ma' && !hasQuestion && !sequence.some(s => s.id === 'ma')) return true;
@@ -1458,6 +1488,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
           return false;
         });
       }
+      if (last.id === 'yixia') {
+        // 'yixia' (一下 - um pouquinho / uma olhadinha): followed by particles, things/clothes or people
+        return WORDS.filter(w => ['ma', 'ba_part', 'ne', 'xing', 'yifu', 'shu', 'cai'].includes(w.id) || ['thing', 'pronoun', 'family'].includes(w.category));
+      }
       if (['hen', 'zhen', 'bijiao', 'feichang'].includes(last.id)) {
         return WORDS.filter(w => w.category === 'adjective' || w.category === 'verb');
       }
@@ -1571,8 +1605,25 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'keyi') {
-        // 'keyi' (可以 - poder / permissão): seguido de ações (shuo, zuo, he, chi, jin, da_call, fa_verb, qu_verb, kan) ou preposição gei
-        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'chi', 'jin', 'da_call', 'fa_verb', 'qu_verb', 'kan'].includes(w.id) || w.id === 'gei');
+        // 'keyi' (可以 - poder / permissão): seguido de ações (shuo, zuo, he, chi, jin, da_call, fa_verb, qu_verb, kan, shi_try) ou preposição gei
+        return WORDS.filter(w => ['shuo', 'zuo', 'he', 'chi', 'jin', 'da_call', 'fa_verb', 'qu_verb', 'kan', 'shi_try'].includes(w.id) || w.id === 'gei');
+      }
+
+      if (last.id === 'rang') {
+        // 'rang' (让 - deixar / permitir): seguido de pessoa (pronome, família, substantivo)
+        return WORDS.filter(w => ['pronoun', 'family'].includes(w.category) || ['laoshi', 'pengyou', 'xuesheng', 'dajia'].includes(w.id));
+      }
+
+      if (last.id === 'deng') {
+        // 'deng' (等 - esperar):
+        // 等一下 / 等等 / 等我 / 等你
+        return WORDS.filter(w => ['yixia', 'deng', 'ma', 'ba_part', 'ne', 'le'].includes(w.id) || ['pronoun', 'family', 'number'].includes(w.category));
+      }
+
+      if (last.id === 'shi_try') {
+        // 'shi_try' (试 - provar / experimentar):
+        // 试一下 / 试一试 / 试试 / 试衣服 / 试吃
+        return WORDS.filter(w => ['yixia', 'yi', 'shi_try', 'chi', 'yifu', 'waitao', 'duanxiu', 'qunzi', 'kuzi', 'cai', 'dangao', 'ma', 'ba_part', 'ne', 'le'].includes(w.id) || w.category === 'thing');
       }
 
       if (last.id === 'hui') {
@@ -1773,10 +1824,10 @@ function getAvailableWordsForSequence(sequence: Word[]): Word[] {
       }
 
       if (last.id === 'chaoshi' || last.id === 'xuexiao' || last.id === 'daxue') {
-        // Destination followed by particle, question, or purpose action (e.g. qu xuexiao kan shu)
+        // Destination followed by particle, question, or purpose action (e.g. qu chaoshi mai yidalimian / qu xuexiao kan shu)
         return WORDS.filter(w => {
           if (['ba_part', 'ma', 'de', 'zenmeyang', 'he_conj'].includes(w.id)) return true;
-          if (['kan', 'xuexi', 'shuo', 'zuo', 'he', 'chi', 'you_verb', 'dagai'].includes(w.id)) return true;
+          if (['kan', 'xuexi', 'shuo', 'zuo', 'he', 'chi', 'you_verb', 'dagai', 'mai', 'mai_sell', 'wan'].includes(w.id)) return true;
           if (w.category === 'adverb') return true;
           return false;
         });
@@ -2692,6 +2743,7 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
 // Helper to convert an app tab into its canonical URL slug
 export const getTabSlug = (tab: AppModeTab): string => {
   switch (tab) {
+    case 'repeticoes': return 'repeticoes';
     case 'slots': return 'cassino';
     case 'shop': return 'loja';
     case 'practice': return 'pratica';
@@ -2741,6 +2793,10 @@ export const parseRouteLocation = (): {
   }
 
   // App Modes requested by user:
+  // * repeticoes / duplicadora / reduplicacao
+  if (slug === 'repeticoes' || slug === 'repetição' || slug === 'repeticao' || slug === 'duplicadora' || slug === 'reduplicacao' || slug === 'reduplicação' || slug === 'dieci') {
+    return { tab: 'repeticoes' };
+  }
   // * cassino : para o modo caça-níqueis
   if (slug === 'cassino' || slug === 'caca-niqueis' || slug === 'cacaniqueis' || slug === 'slots' || slug === 'slot' || slug === 'niqueis') {
     return { tab: 'slots' };
@@ -2891,6 +2947,8 @@ export default function App() {
 
   const currentModeInfo = useMemo(() => {
     switch (activeTab) {
+      case 'repeticoes':
+        return { title: 'Repetições', hanzi: '叠词', icon: '🔁' };
       case 'slots':
         return { title: 'Caça-níqueis', hanzi: '老虎机', icon: '🎰' };
       case 'shop':
@@ -3134,7 +3192,7 @@ export default function App() {
                     Fraseiro Mandarim
                   </h1>
                   <span className="text-[10px] text-slate-400 font-mono hidden min-[480px]:inline">
-                    v1.2026.11.04
+                    v1.2026.11.05
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -3271,6 +3329,25 @@ export default function App() {
           <div className="hidden md:flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
             <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 overflow-x-auto max-w-full">
               
+              <button
+                id="tab-repeticoes-btn"
+                onClick={() => navigateToTab('repeticoes')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'repeticoes'
+                    ? 'bg-purple-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Módulo Repetições: esteira e máquina duplicadora de ideogramas"
+              >
+                <span>🔁</span>
+                <span>Repetições</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'repeticoes' ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
+                }`}>
+                  Novo
+                </span>
+              </button>
+
               <button
                 id="tab-slots-btn"
                 onClick={() => navigateToTab('slots')}
@@ -3423,6 +3500,8 @@ export default function App() {
               validateAndBuildPhrase={validateAndBuildPhrase}
             />
           )
+        ) : activeTab === "repeticoes" ? (
+          <ReduplicationMode />
         ) : activeTab === "slots" ? (
           <SlotMachineMode />
         ) : activeTab === "flashcards" ? (
