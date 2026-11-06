@@ -18,14 +18,15 @@ import {
   Flame,
   Zap,
   Tag,
-  Mic
+  Mic,
+  GraduationCap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes' | 'pronuncia';
 
 export interface ModeMenuItem {
-  id: AppModeTab | 'numbers' | 'dictionary' | 'false_friends';
+  id: AppModeTab | 'numbers' | 'dictionary' | 'false_friends' | 'tutorial';
   title: string;
   hanzi: string;
   pinyin: string;
@@ -193,6 +194,19 @@ export const ALL_MODES_CONFIG: ModeMenuItem[] = [
     themeColor: 'from-amber-700 to-yellow-600',
     isModal: true,
   },
+  {
+    id: 'tutorial',
+    title: 'Tutorial Interativo',
+    hanzi: '新手指南',
+    pinyin: 'xīnshǒu zhǐnán',
+    description: 'Tour guiado completo passo a passo explicando como funciona cada módulo e recurso do app.',
+    category: 'reference',
+    icon: GraduationCap,
+    badge: 'Tour 1 min',
+    badgeColor: 'bg-indigo-600 text-white font-bold',
+    themeColor: 'from-indigo-600 to-rose-600',
+    isModal: true,
+  },
 ];
 
 interface ModesMenuModalProps {
@@ -203,6 +217,7 @@ interface ModesMenuModalProps {
   onOpenDictionary: () => void;
   onOpenNumbers: () => void;
   onOpenFalseFriends: () => void;
+  onOpenTutorial?: () => void;
 }
 
 export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
@@ -213,6 +228,7 @@ export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
   onOpenDictionary,
   onOpenNumbers,
   onOpenFalseFriends,
+  onOpenTutorial,
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'games' | 'hanzi_chars' | 'communication' | 'reference'>('all');
@@ -239,6 +255,8 @@ export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
       onOpenNumbers();
     } else if (item.id === 'false_friends') {
       onOpenFalseFriends();
+    } else if (item.id === 'tutorial') {
+      if (onOpenTutorial) onOpenTutorial();
     } else {
       onSelectTab(item.id as AppModeTab);
     }

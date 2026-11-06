@@ -15,7 +15,7 @@ import {
   ListOrdered, PauseCircle, Award, BookOpen, Coins, Sun,
   Volume2, Compass, Layers, Shuffle, Plus, Mic, PenTool,
   Hash, LogOut, Flame, AlertTriangle, Calendar, ShoppingBag, Shirt, LogIn,
-  Menu, LayoutGrid, ChevronDown, Clock
+  Menu, LayoutGrid, ChevronDown, Clock, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Word, HskLevel, PhraseValidationReport, PhraseValidationStep, DidYouMeanResult, DidYouMeanPart, ContextualGrammarTip } from './types';
@@ -32,6 +32,7 @@ import { ShopMode } from './components/ShopMode';
 import { SlotMachineMode } from './components/SlotMachineMode';
 import { ReduplicationMode } from './components/ReduplicationMode';
 import { PronunciationMode } from './components/PronunciationMode';
+import { InteractiveTutorialModal } from './components/InteractiveTutorialModal';
 import { ModesMenuModal, AppModeTab } from './components/ModesMenuModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
@@ -2760,7 +2761,7 @@ export const getTabSlug = (tab: AppModeTab): string => {
 // Parser to inspect the current browser URL (path, hash or query) and resolve the corresponding mode or modal
 export const parseRouteLocation = (): {
   tab?: AppModeTab;
-  modal?: 'dictionary' | 'numbers' | 'false_friends';
+  modal?: 'dictionary' | 'numbers' | 'false_friends' | 'tutorial';
 } => {
   if (typeof window === 'undefined') return { tab: 'chat' };
 
@@ -2781,6 +2782,10 @@ export const parseRouteLocation = (): {
   if (!slug) return { tab: 'chat' };
 
   // Modals requested by user:
+  // * tutorial : Tour interativo
+  if (slug === 'tutorial' || slug === 'guia' || slug === 'ajuda' || slug === 'tour' || slug === 'help') {
+    return { modal: 'tutorial' };
+  }
   // * nao-conf : "Não confundir"
   if (slug === 'nao-conf' || slug === 'naoconf' || slug === 'nao-confundir' || slug === 'naoconfundir' || slug === 'falsos-cognatos') {
     return { modal: 'false_friends' };
@@ -2845,6 +2850,17 @@ export default function App() {
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(initialRoute.modal === 'dictionary');
   const [isNumbersModalOpen, setIsNumbersModalOpen] = useState<boolean>(initialRoute.modal === 'numbers');
   const [isFalseFriendsOpen, setIsFalseFriendsOpen] = useState<boolean>(initialRoute.modal === 'false_friends');
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(() => {
+    if (initialRoute.modal === 'tutorial') return true;
+    if (typeof window !== 'undefined') {
+      // Primeira vez que o usuário abre o programa: abre o tutorial automaticamente
+      return !localStorage.getItem('fraseiro_tutorial_completed_v1');
+    }
+    return false;
+  });
+  const [tutorialStepIndex, setTutorialStepIndex] = useState<number>(0);
+  const [isTutorialExploringMode, setIsTutorialExploringMode] = useState<boolean>(false);
+  const [exploringModeTitle, setExploringModeTitle] = useState<string>('');
   const [isModesMenuOpen, setIsModesMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -2860,24 +2876,34 @@ export default function App() {
     const handleUrlChange = () => {
       const route = parseRouteLocation();
       if (route.modal) {
-        if (route.modal === 'dictionary') {
+        if (route.modal === 'tutorial') {
+          setIsTutorialOpen(true);
+          setIsTutorialExploringMode(false);
+          setIsDictionaryOpen(false);
+          setIsNumbersModalOpen(false);
+          setIsFalseFriendsOpen(false);
+        } else if (route.modal === 'dictionary') {
           setIsDictionaryOpen(true);
           setIsNumbersModalOpen(false);
           setIsFalseFriendsOpen(false);
+          setIsTutorialOpen(false);
         } else if (route.modal === 'numbers') {
           setIsNumbersModalOpen(true);
           setIsDictionaryOpen(false);
           setIsFalseFriendsOpen(false);
+          setIsTutorialOpen(false);
         } else if (route.modal === 'false_friends') {
           setIsFalseFriendsOpen(true);
           setIsDictionaryOpen(false);
           setIsNumbersModalOpen(false);
+          setIsTutorialOpen(false);
         }
       } else if (route.tab) {
         setActiveTab(route.tab);
         setIsDictionaryOpen(false);
         setIsNumbersModalOpen(false);
         setIsFalseFriendsOpen(false);
+        setIsTutorialOpen(false);
       }
     };
 
@@ -2895,6 +2921,7 @@ export default function App() {
     setIsDictionaryOpen(false);
     setIsNumbersModalOpen(false);
     setIsFalseFriendsOpen(false);
+    setIsTutorialOpen(false);
 
     if (typeof window !== 'undefined') {
       const slug = getTabSlug(tab);
@@ -2906,6 +2933,61 @@ export default function App() {
           window.history.pushState({ tab }, '', targetPath);
         }
       }
+    }
+  }, []);
+
+  const openTutorial = useCallback(() => {
+    setIsTutorialOpen(true);
+    setIsTutorialExploringMode(false);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'tutorial' }, '', '/tutorial');
+    }
+  }, []);
+
+  const closeTutorial = useCallback(() => {
+    setIsTutorialOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
+
+  const handleStartExploringMode = useCallback((stepIndex: number, modeTitle: string) => {
+    setTutorialStepIndex(stepIndex);
+    setExploringModeTitle(modeTitle);
+    setIsTutorialExploringMode(true);
+    setIsTutorialOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
+
+  const handleCompleteTutorial = useCallback(() => {
+    setIsTutorialOpen(false);
+    setIsTutorialExploringMode(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fraseiro_tutorial_completed_v1', 'true');
+      window.history.replaceState({ tab: activeTab }, '', `/${getTabSlug(activeTab)}`);
+    }
+  }, [activeTab]);
+
+  const onHeaderTutorialClick = useCallback(() => {
+    if (isTutorialExploringMode) {
+      setIsTutorialOpen(true);
+      setIsTutorialExploringMode(false);
+      if (typeof window !== 'undefined') {
+        window.history.pushState({ modal: 'tutorial' }, '', '/tutorial');
+      }
+    } else {
+      openTutorial();
+    }
+  }, [isTutorialExploringMode, openTutorial]);
+
+  const handleAdvanceToNextTutorialStep = useCallback(() => {
+    setIsTutorialExploringMode(false);
+    setIsTutorialOpen(true);
+    setTutorialStepIndex((prev) => Math.min(11, prev + 1));
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ modal: 'tutorial' }, '', '/tutorial');
     }
   }, []);
 
@@ -3233,6 +3315,40 @@ export default function App() {
                 <span className="px-1.5 py-0.2 rounded-md bg-indigo-500 text-[10px] font-bold">
                   7
                 </span>
+              </button>
+
+              {/* Botão Tutorial Interativo com modo piscante ao explorar novo modo */}
+              <button
+                type="button"
+                id="btn-open-tutorial-header"
+                onClick={onHeaderTutorialClick}
+                className={
+                  isTutorialExploringMode
+                    ? "relative flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg select-none bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 ring-4 ring-amber-300/80 animate-pulse hover:from-amber-300 hover:to-amber-200 active:scale-95 shadow-amber-400/40"
+                    : "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 transition-all cursor-pointer shadow-2xs"
+                }
+                title={
+                  isTutorialExploringMode
+                    ? "Tutorial aguardando você explorar o modo! Clique para abrir o tutorial e avançar para o próximo modo"
+                    : "Abrir o tutorial explicativo do aplicativo (ou rota /tutorial)"
+                }
+              >
+                {isTutorialExploringMode ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                    </span>
+                    <span>🎓</span>
+                    <span className="hidden sm:inline">Continuar Tutorial ▶</span>
+                    <span className="sm:hidden">Continuar ▶</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🎓</span>
+                    <span className="hidden sm:inline">Tutorial</span>
+                  </>
+                )}
               </button>
 
               {/* Botões Rápidos de Consulta (Visíveis em Telas Médias e Grandes) */}
@@ -3700,7 +3816,61 @@ export default function App() {
           onOpenDictionary={openDictionary}
           onOpenNumbers={openNumbers}
           onOpenFalseFriends={openFalseFriends}
+          onOpenTutorial={openTutorial}
         />
+
+        {/* Tutorial Interativo com Tour por Todos os Módulos */}
+        <InteractiveTutorialModal
+          isOpen={isTutorialOpen}
+          onClose={closeTutorial}
+          activeTab={activeTab}
+          onNavigateTab={(tab) => navigateToTab(tab)}
+          currentStepIndex={tutorialStepIndex}
+          onStepChange={setTutorialStepIndex}
+          onExploreCurrentMode={handleStartExploringMode}
+          onCompleteTutorial={handleCompleteTutorial}
+          onOpenDictionary={openDictionary}
+          onOpenNumbers={openNumbers}
+          onOpenFalseFriends={openFalseFriends}
+        />
+
+        {/* Barra Flutuante de Exploração do Tutorial (Item 2 do pedido) */}
+        {isTutorialExploringMode && (
+          <aside
+            aria-label="Barra de exploração do modo durante o tutorial"
+            className="fixed bottom-16 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 px-3.5 py-2.5 bg-slate-950/95 text-white backdrop-blur-md rounded-2xl border-2 border-amber-400 shadow-2xl max-w-[92vw]"
+          >
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+              </span>
+              <span className="text-xs sm:text-sm font-semibold truncate">
+                Explore <strong className="text-amber-300">{exploringModeTitle || 'o modo'}</strong> à vontade!
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={onHeaderTutorialClick}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer"
+                title="Ver explicação deste modo"
+              >
+                Dicas
+              </button>
+              <button
+                type="button"
+                onClick={handleAdvanceToNextTutorialStep}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 text-slate-950 text-xs font-black transition-all active:scale-95 shadow-md flex items-center gap-1 cursor-pointer"
+                title="Avançar para o próximo modo do tutorial"
+              >
+                <span>Próximo Modo</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
