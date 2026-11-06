@@ -31,6 +31,7 @@ import { HanziFlashcardsMode } from './components/HanziFlashcardsMode';
 import { ShopMode } from './components/ShopMode';
 import { SlotMachineMode } from './components/SlotMachineMode';
 import { ReduplicationMode } from './components/ReduplicationMode';
+import { PronunciationMode } from './components/PronunciationMode';
 import { ModesMenuModal, AppModeTab } from './components/ModesMenuModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
 import { generateGrammarOrderTip } from './utils/grammarTips';
@@ -2743,6 +2744,7 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
 // Helper to convert an app tab into its canonical URL slug
 export const getTabSlug = (tab: AppModeTab): string => {
   switch (tab) {
+    case 'pronuncia': return 'pronuncia';
     case 'repeticoes': return 'repeticoes';
     case 'slots': return 'cassino';
     case 'shop': return 'loja';
@@ -2793,6 +2795,10 @@ export const parseRouteLocation = (): {
   }
 
   // App Modes requested by user:
+  // * pronuncia / voz / fala
+  if (slug === 'pronuncia' || slug === 'pronúncia' || slug === 'voz' || slug === 'fala' || slug === 'speech' || slug === 'audio') {
+    return { tab: 'pronuncia' };
+  }
   // * repeticoes / duplicadora / reduplicacao
   if (slug === 'repeticoes' || slug === 'repetição' || slug === 'repeticao' || slug === 'duplicadora' || slug === 'reduplicacao' || slug === 'reduplicação' || slug === 'dieci') {
     return { tab: 'repeticoes' };
@@ -2947,6 +2953,8 @@ export default function App() {
 
   const currentModeInfo = useMemo(() => {
     switch (activeTab) {
+      case 'pronuncia':
+        return { title: 'Pronúncia & Voz', hanzi: '发音', icon: '🎙️' };
       case 'repeticoes':
         return { title: 'Repetições', hanzi: '叠词', icon: '🔁' };
       case 'slots':
@@ -3192,7 +3200,7 @@ export default function App() {
                     Fraseiro Mandarim
                   </h1>
                   <span className="text-[10px] text-slate-400 font-mono hidden min-[480px]:inline">
-                    v1.2026.11.05
+                    v1.2026.11.06
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -3330,6 +3338,25 @@ export default function App() {
             <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 overflow-x-auto max-w-full">
               
               <button
+                id="tab-pronuncia-btn"
+                onClick={() => navigateToTab('pronuncia')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'pronuncia'
+                    ? 'bg-rose-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Modo Pronúncia: fale pelo microfone, avalie proximidade com IA e treine palavras problemáticas"
+              >
+                <Mic className="w-3.5 h-3.5 text-rose-300" />
+                <span>Pronúncia & Voz</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'pronuncia' ? 'bg-rose-800 text-white' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  Novo
+                </span>
+              </button>
+
+              <button
                 id="tab-repeticoes-btn"
                 onClick={() => navigateToTab('repeticoes')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -3344,7 +3371,7 @@ export default function App() {
                 <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
                   activeTab === 'repeticoes' ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
                 }`}>
-                  Novo
+                  Reduplicar
                 </span>
               </button>
 
@@ -3500,6 +3527,11 @@ export default function App() {
               validateAndBuildPhrase={validateAndBuildPhrase}
             />
           )
+        ) : activeTab === "pronuncia" ? (
+          <PronunciationMode
+            allWords={WORDS}
+            builderSequence={sequence}
+          />
         ) : activeTab === "repeticoes" ? (
           <ReduplicationMode />
         ) : activeTab === "slots" ? (
@@ -3578,9 +3610,23 @@ export default function App() {
         >
           <button
             type="button"
+            id="mobile-bottom-pronuncia-btn"
+            onClick={() => navigateToTab('pronuncia')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'pronuncia' 
+                ? 'text-rose-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Mic className="w-4 h-4 text-rose-500" />
+            <span className="text-[10px] font-bold">Voz</span>
+          </button>
+
+          <button
+            type="button"
             id="mobile-bottom-slots-btn"
             onClick={() => navigateToTab('slots')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'slots' 
                 ? 'text-amber-600 font-black scale-105' 
                 : 'text-slate-500 hover:text-slate-800'

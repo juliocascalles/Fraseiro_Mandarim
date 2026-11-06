@@ -227,7 +227,7 @@ async function startServer() {
 
   // API Route for Mandarin Audio Speech-to-Text & Pronunciation Analysis with Gemini
   app.post("/api/transcribe-audio", async (req, res) => {
-    const { audioBase64, mimeType, targetPhrase } = req.body;
+    const { audioBase64, mimeType, targetPhrase, targetWords } = req.body;
 
     if (!audioBase64) {
       return res.status(400).json({ error: "Nenhum dado de áudio fornecido" });
@@ -253,29 +253,60 @@ async function startServer() {
       // Strip any data:audio/...;base64, prefix if present
       const cleanBase64 = audioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
 
+      const wordsContext = Array.isArray(targetWords) && targetWords.length > 0
+        ? `\nPalavras-chave esperadas na frase com seus IDs e tons:\n${JSON.stringify(targetWords, null, 2)}`
+        : '';
+
       const prompt = `Você é um avaliador de pronúncia e transcritor profissional de Mandarim (Standard Mandarin Chinese / 普通话).
 Ouça atentamente este áudio gravado por um estudante de chinês.
-${targetPhrase ? `A frase alvo que o estudante estava tentando pronunciar é: "${targetPhrase}".` : 'O estudante está falando livremente em mandarim.'}
+${targetPhrase ? `A frase alvo que o estudante deveria pronunciar é: "${targetPhrase}".` : 'O estudante está falando livremente em mandarim.'}
+${wordsContext}
 
 Tarefas:
-1. Transcreva com fidelidade o que foi falado em caracteres chineses (Hanzi simplificado).
-2. Forneça o pinyin completo com marcações tonais corretas (ex: mā, má, mǎ, mà).
-3. Traduza a fala em português do Brasil de forma natural.
-4. Avalie a precisão da pronúncia (0 a 100), levando em consideração clareza, sandhi tonal e articulação.
-5. Escreva um feedback curto (1 a 2 frases) em português, encorajador e específico sobre os tons ou fonética percebidos.
+1. Transcreva com fidelidade o que o estudante realmente falou em caracteres chineses (Hanzi simplificado).
+2. Forneça o pinyin completo com marcações de tom exatas (ex: mā, má, mǎ, mà).
+3. Traduza a fala capturada para o português do Brasil.
+4. Avalie a proximidade geral com a frase alvo em uma escala de 0 a 100 ("accuracyScore"):
+   - 100: pronúncia perfeita em tons e consoantes/vogais.
+   - 80-99: pequenos desvios de tom ou hesitações, mas compreensível.
+   - 50-79: palavras trocadas, tons invertidos ou omissões parciais.
+   - 0-49: fala inaudível, outro idioma ou pronúncia muito distante.
+5. Faça uma avaliação palavra por palavra ("wordsEvaluation") para cada palavra da frase alvo:
+   - "wordId": id correspondente ou vazio
+   - "hanzi": hanzi esperado
+   - "pinyin": pinyin esperado
+   - "spokenPinyin": o que foi percebido no áudio
+   - "isCorrect": true se o estudante pronunciou corretamente o som e o tom
+   - "errorType": "none", "tone" (erro de tom), "phoneme" (som trocado), "omitted" (não pronunciou), ou "substituted" (disse outra palavra)
+   - "tip": breve explicação em português (ex: "Tom 3 pronunciado como tom 4")
+6. Monte duas listas de IDs: "failedWordIds" (palavras com erro) e "passedWordIds" (palavras acertadas).
+7. Escreva um feedback pedagógico e encorajador em português (1 a 2 frases) destacando o que ficou ótimo e o que pode melhorar.
 
 Retorne EXCLUSIVAMENTE um objeto JSON válido no formato abaixo, sem formatação Markdown e sem blocos de código:
 {
-  "transcript": "caracteres chineses reconhecidos",
-  "pinyin": "pinyin com acentos tonais",
+  "transcript": "caracteres falados",
+  "pinyin": "pinyin falado com tons",
   "portuguese": "tradução em português",
   "confidence": 0.95,
-  "accuracyScore": 90,
-  "feedback": "Excelente articulação de nǐ hǎo com o terceiro tom suavizado."
+  "accuracyScore": 88,
+  "feedback": "Boa pronúncia geral! Cuidado apenas com o tom de 买 (mǎi) que soou como mài.",
+  "wordsEvaluation": [
+    {
+      "wordId": "mai",
+      "hanzi": "买",
+      "pinyin": "mǎi",
+      "spokenPinyin": "mài",
+      "isCorrect": false,
+      "errorType": "tone",
+      "tip": "Você pronunciou no 4º tom descendente em vez do 3º tom descendente-ascendente."
+    }
+  ],
+  "failedWordIds": ["mai"],
+  "passedWordIds": ["wo", "xiang", "pingguo"]
 }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: [
           {
             role: 'user',
@@ -316,9 +347,12 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido no formato abaixo, sem formataçã
         transcript: parsedResult.transcript || "",
         pinyin: parsedResult.pinyin || "",
         portuguese: parsedResult.portuguese || "",
-        accuracyScore: typeof parsedResult.accuracyScore === 'number' ? parsedResult.accuracyScore : 85,
+        accuracyScore: typeof parsedResult.accuracyScore === 'number' ? Math.min(100, Math.max(0, parsedResult.accuracyScore)) : 85,
         confidence: parsedResult.confidence || 0.9,
-        feedback: parsedResult.feedback || "Pronúncia processada com sucesso!"
+        feedback: parsedResult.feedback || "Pronúncia processada com sucesso!",
+        wordsEvaluation: Array.isArray(parsedResult.wordsEvaluation) ? parsedResult.wordsEvaluation : [],
+        failedWordIds: Array.isArray(parsedResult.failedWordIds) ? parsedResult.failedWordIds : [],
+        passedWordIds: Array.isArray(parsedResult.passedWordIds) ? parsedResult.passedWordIds : []
       });
 
     } catch (err: any) {

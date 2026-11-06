@@ -17,11 +17,12 @@ import {
   Layers,
   Flame,
   Zap,
-  Tag
+  Tag,
+  Mic
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes';
+export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes' | 'pronuncia';
 
 export interface ModeMenuItem {
   id: AppModeTab | 'numbers' | 'dictionary' | 'false_friends';
@@ -40,6 +41,18 @@ export interface ModeMenuItem {
 export const ALL_MODES_CONFIG: ModeMenuItem[] = [
   // 1. Jogos & Prática Ativa
   {
+    id: 'pronuncia',
+    title: 'Modo Pronúncia & Voz',
+    hanzi: '发音训练',
+    pinyin: 'fāyīn xùnliàn',
+    description: 'Fale pelo microfone com GenAI Speech-to-Text: o app diz a frase, avalia sua proximidade, destaca erros e prioriza palavras difíceis.',
+    category: 'communication',
+    icon: Mic,
+    badge: 'Novo',
+    badgeColor: 'bg-rose-600 text-white font-black',
+    themeColor: 'from-rose-600 to-indigo-600',
+  },
+  {
     id: 'repeticoes',
     title: 'Módulo Repetições',
     hanzi: '叠词机器',
@@ -47,7 +60,7 @@ export const ALL_MODES_CONFIG: ModeMenuItem[] = [
     description: 'Esteira e Máquina Duplicadora: verbos suavizados (看看, 试一试, 等等), modéstia (哪里哪里) e universalidade (天天, 人人).',
     category: 'games',
     icon: '🔁',
-    badge: 'Novo',
+    badge: 'Reduplicar',
     badgeColor: 'bg-purple-600 text-white font-black',
     themeColor: 'from-purple-600 to-indigo-600',
   },
@@ -447,7 +460,7 @@ export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
           <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Fraseiro Mandarim • v1.2026.11.05</span>
+              <span>Fraseiro Mandarim • v1.2026.11.06</span>
             </span>
             <span className="hidden sm:inline text-slate-400">
               Toque em qualquer card para alternar instantaneamente
