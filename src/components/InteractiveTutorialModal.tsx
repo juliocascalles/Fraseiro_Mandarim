@@ -243,8 +243,32 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     actionPrompt: 'Faça um teste de 5 perguntas e veja sua pontuação subir!'
   },
   {
+    id: 'hq_comic',
+    title: '10. Módulo HQ: Pato & Peixe',
+    hanzi: '连环画 (鸭与鱼)',
+    pinyin: 'liánhuánhuà (yā yǔ yú)',
+    targetTab: 'hq',
+    icon: '🦆',
+    themeColor: 'from-amber-500 to-emerald-600',
+    badge: 'História em Quadrinhos',
+    summary: 'História em quadrinhos com pato e peixe para dominar as diferenças entre 会 (habilidade aprendida/inata), 一点儿 (um pouco), 能 (capacidade física), 可以 (permissão) e 知道 (informação).',
+    keyPoints: [
+      '① O peixe sabe nadar por natureza (会, 能, 可以)',
+      '② O pato também sabe nadar um pouco (会, 能, 可以, 一点儿)',
+      '③ O pato ferido sabe, mas NÃO CONSEGUE nadar (sem o 能)',
+      '④ Proibido nadar no lago (sem o 可以)',
+      '⑤ O peixe não tem a informação do nome (sem o 知道)'
+    ],
+    previewSnippet: {
+      hanzi: '这条鱼会游泳。这只鸭子不能游泳。',
+      pinyin: 'Zhè tiáo yú huì yóuyǒng. Zhè zhī yāzi bù néng yóuyǒng.',
+      translation: 'O peixe sabe nadar. O pato ferido não consegue nadar.'
+    },
+    actionPrompt: 'Responda as 5 perguntas com os 5 checkboxes e valide suas respostas!'
+  },
+  {
     id: 'reference_tools',
-    title: '10. Ferramentas de Consulta & Apoio',
+    title: '11. Ferramentas de Consulta & Apoio',
     hanzi: '参考工具',
     pinyin: 'cānkǎo gōngjù',
     icon: BookOpen,
@@ -260,7 +284,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'pwa_install',
-    title: '11. Instalação do Aplicativo (Celular, Tablet e PC)',
+    title: '12. Instalação do Aplicativo (Celular, Tablet e PC)',
     hanzi: '应用安装',
     pinyin: 'yìngyòng ānzhuāng',
     icon: Smartphone,

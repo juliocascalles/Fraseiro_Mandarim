@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes' | 'pronuncia';
+export type AppModeTab = 'chat' | 'slots' | 'hanzi' | 'practice' | 'quiz' | 'flashcards' | 'shop' | 'repeticoes' | 'pronuncia' | 'hq';
 
 export interface ModeMenuItem {
   id: AppModeTab | 'numbers' | 'dictionary' | 'false_friends' | 'tutorial';
@@ -42,6 +42,18 @@ export interface ModeMenuItem {
 export const ALL_MODES_CONFIG: ModeMenuItem[] = [
   // 1. Jogos & Prática Ativa
   {
+    id: 'hq',
+    title: 'Módulo HQ: Pato & Peixe',
+    hanzi: '连环画 (鸭与鱼)',
+    pinyin: 'liánhuánhuà (yā yǔ yú)',
+    description: 'História em quadrinhos com 5 perguntas e 5 checkboxes para dominar 会 (huì), 一点儿 (yìdiǎnr), 能 (néng), 可以 (kěyǐ) e 知道 (zhīdào).',
+    category: 'games',
+    icon: '🦆',
+    badge: 'Novo HQ',
+    badgeColor: 'bg-amber-500 text-slate-950 font-black',
+    themeColor: 'from-amber-500 via-orange-500 to-emerald-600',
+  },
+  {
     id: 'pronuncia',
     title: 'Modo Pronúncia & Voz',
     hanzi: '发音训练',
@@ -49,7 +61,7 @@ export const ALL_MODES_CONFIG: ModeMenuItem[] = [
     description: 'Fale pelo microfone com GenAI Speech-to-Text: o app diz a frase, avalia sua proximidade, destaca erros e prioriza palavras difíceis.',
     category: 'communication',
     icon: Mic,
-    badge: 'Novo',
+    badge: 'Voz IA',
     badgeColor: 'bg-rose-600 text-white font-black',
     themeColor: 'from-rose-600 to-indigo-600',
   },
@@ -478,7 +490,7 @@ export const ModesMenuModal: React.FC<ModesMenuModalProps> = ({
           <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Fraseiro Mandarim • v1.2026.11.06</span>
+              <span>Fraseiro Mandarim • v1.2026.11.11</span>
             </span>
             <span className="hidden sm:inline text-slate-400">
               Toque em qualquer card para alternar instantaneamente

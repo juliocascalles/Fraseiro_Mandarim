@@ -32,6 +32,7 @@ import { ShopMode } from './components/ShopMode';
 import { SlotMachineMode } from './components/SlotMachineMode';
 import { ReduplicationMode } from './components/ReduplicationMode';
 import { PronunciationMode } from './components/PronunciationMode';
+import { HQComicMode } from './components/HQComicMode';
 import { InteractiveTutorialModal } from './components/InteractiveTutorialModal';
 import { ModesMenuModal, AppModeTab } from './components/ModesMenuModal';
 import { GrammarTipBalloon } from './components/GrammarTipBalloon';
@@ -2745,6 +2746,7 @@ function validateWordSequence(seq: Word[]): { success: boolean; stoppedAtIndex: 
 // Helper to convert an app tab into its canonical URL slug
 export const getTabSlug = (tab: AppModeTab): string => {
   switch (tab) {
+    case 'hq': return 'hq';
     case 'pronuncia': return 'pronuncia';
     case 'repeticoes': return 'repeticoes';
     case 'slots': return 'cassino';
@@ -2800,6 +2802,10 @@ export const parseRouteLocation = (): {
   }
 
   // App Modes requested by user:
+  // * hq / quadrinhos / comic / pato / peixe
+  if (slug === 'hq' || slug === 'quadrinhos' || slug === 'quadrinho' || slug === 'comic' || slug === 'comics' || slug === 'pato' || slug === 'peixe' || slug === 'pato-e-peixe' || slug === 'pato-peixe') {
+    return { tab: 'hq' };
+  }
   // * pronuncia / voz / fala
   if (slug === 'pronuncia' || slug === 'pronúncia' || slug === 'voz' || slug === 'fala' || slug === 'speech' || slug === 'audio') {
     return { tab: 'pronuncia' };
@@ -2985,7 +2991,7 @@ export default function App() {
   const handleAdvanceToNextTutorialStep = useCallback(() => {
     setIsTutorialExploringMode(false);
     setIsTutorialOpen(true);
-    setTutorialStepIndex((prev) => Math.min(11, prev + 1));
+    setTutorialStepIndex((prev) => Math.min(12, prev + 1));
     if (typeof window !== 'undefined') {
       window.history.pushState({ modal: 'tutorial' }, '', '/tutorial');
     }
@@ -3035,6 +3041,8 @@ export default function App() {
 
   const currentModeInfo = useMemo(() => {
     switch (activeTab) {
+      case 'hq':
+        return { title: 'Módulo HQ (Pato & Peixe)', hanzi: '连环画', icon: '🦆' };
       case 'pronuncia':
         return { title: 'Pronúncia & Voz', hanzi: '发音', icon: '🎙️' };
       case 'repeticoes':
@@ -3282,7 +3290,7 @@ export default function App() {
                     Fraseiro Mandarim
                   </h1>
                   <span className="text-[10px] text-slate-400 font-mono hidden min-[480px]:inline">
-                    v1.2026.11.06
+                    v1.2026.11.11
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -3313,7 +3321,7 @@ export default function App() {
                 <span className="hidden sm:inline">Modos de Estudo</span>
                 <span className="sm:hidden">Modos</span>
                 <span className="px-1.5 py-0.2 rounded-md bg-indigo-500 text-[10px] font-bold">
-                  7
+                  8
                 </span>
               </button>
 
@@ -3453,6 +3461,25 @@ export default function App() {
           <div className="hidden md:flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
             <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 overflow-x-auto max-w-full">
               
+              <button
+                id="tab-hq-btn"
+                onClick={() => navigateToTab('hq')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'hq'
+                    ? 'bg-gradient-to-r from-amber-500 to-emerald-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Módulo HQ: História em quadrinhos do Pato e Peixe (会, 一点儿, 能, 可以 e 知道)"
+              >
+                <span>🦆</span>
+                <span>Módulo HQ</span>
+                <span className={`text-[8px] px-1 py-0.2 rounded-full font-bold uppercase ${
+                  activeTab === 'hq' ? 'bg-amber-950 text-amber-200' : 'bg-amber-100 text-amber-900 font-black'
+                }`}>
+                  Novo HQ
+                </span>
+              </button>
+
               <button
                 id="tab-pronuncia-btn"
                 onClick={() => navigateToTab('pronuncia')}
@@ -3643,6 +3670,8 @@ export default function App() {
               validateAndBuildPhrase={validateAndBuildPhrase}
             />
           )
+        ) : activeTab === "hq" ? (
+          <HQComicMode />
         ) : activeTab === "pronuncia" ? (
           <PronunciationMode
             allWords={WORDS}
@@ -3726,9 +3755,23 @@ export default function App() {
         >
           <button
             type="button"
+            id="mobile-bottom-hq-btn"
+            onClick={() => navigateToTab('hq')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'hq' 
+                ? 'text-amber-600 font-black scale-105' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span className="text-base leading-none">🦆</span>
+            <span className="text-[10px] font-bold">HQ</span>
+          </button>
+
+          <button
+            type="button"
             id="mobile-bottom-pronuncia-btn"
             onClick={() => navigateToTab('pronuncia')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
               activeTab === 'pronuncia' 
                 ? 'text-rose-600 font-black scale-105' 
                 : 'text-slate-500 hover:text-slate-800'
